@@ -228,6 +228,7 @@ function buildSessionData(dumped: Map<string, boolean>): SessionData {
     // a user who deliberately turned it off (CodeRabbit, PR #474).
     deckBrainFullPower: state.deckBrainFullPower,
     deckBrainVendor: state.deckBrainVendor,
+    deckBrainBypass: state.deckBrainBypass,
     channelsTabVisible: state.channelsTabVisible,
     paneActionsVisible: state.paneActionsVisible,
     splitInheritsCwd: state.splitInheritsCwd,
@@ -934,6 +935,12 @@ export default function AppLayout() {
   useEffect(() => {
     void window.electronAPI?.deck?.brainVendorSet?.(deckBrainVendorLive);
   }, [deckBrainVendorLive]);
+
+  // Sync bypass mode to main (same main-authority pattern).
+  const deckBrainBypassLive = useStore((s) => s.deckBrainBypass);
+  useEffect(() => {
+    void window.electronAPI?.deck?.brainBypassSet?.(deckBrainBypassLive);
+  }, [deckBrainBypassLive]);
 
   // ─── First-run onboarding (spotlight) detection ─────────────────────
   // D8: spotlight stays gated behind firstRunCompleted so the wizard always

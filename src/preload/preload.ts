@@ -402,6 +402,11 @@ const electronAPI = {
         ok: true;
         vendor: import('../shared/types').BrainVendor;
       }>,
+    brainBypassSet: (bypass: boolean) =>
+      ipcRenderer.invoke(IPC.DECK_BRAIN_BYPASS_SET, { bypass }) as Promise<{
+        ok: true;
+        bypass: boolean;
+      }>,
     status: (workspaceId: string) =>
       ipcRenderer.invoke(IPC.DECK_STATUS, { workspaceId }) as Promise<{
         status: 'idle' | 'busy' | 'disposed';

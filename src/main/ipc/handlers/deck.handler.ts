@@ -266,6 +266,10 @@ export function registerDeckHandler(
             // fullPower is SDK-only (it tunes canUseTool/allowedTools, which
             // an interactive session has no equivalent for).
             ...(adapterOpts.model ? { model: adapterOpts.model } : {}),
+            // Bypass mode (--dangerously-skip-permissions): read from the
+            // MAIN-side authority so it applies to the next spawn regardless
+            // of whether the renderer sent it.
+            bypass: brainBypass,
           });
         }
         console.warn(
@@ -322,6 +326,10 @@ export function registerDeckHandler(
 
   // Brain vendor (BYOB M0) — same main-authority contract as full power.
   let brainVendor: BrainVendor = 'claude';
+
+  // Brain bypass mode — passes --dangerously-skip-permissions to the
+  // claude-pty brain when true. Default ON (same as the Settings checkbox).
+  let brainBypass = true;
 
   // Event-push coalescer. Declared here, constructed below once
   // runTurnForWorkspace exists — the manager's onIdle closure references it
@@ -693,6 +701,37 @@ export function registerDeckHandler(
         }
       }
       return { ok: true, vendor };
+    }),
+  );
+
+  // Brain bypass mode — passes --dangerously-skip-permissions to the
+  // claude-pty brain when true. Applied on the next spawn (same contract as
+  // vendor/fullPower: idle brains retire so the next turn gets the new flag).
+  ipcMain.removeHandler(IPC.DECK_BRAIN_BYPASS_SET);
+  ipcMain.handle(
+    IPC.DECK_BRAIN_BYPASS_SET,
+    wrapHandler(IPC.DECK_BRAIN_BYPASS_SET, async (
+      _event: Electron.IpcMainInvokeEvent,
+      raw: unknown,
+    ): Promise<{ ok: true; bypass: boolean }> => {
+      const req = (raw && typeof raw === 'object' && !Array.isArray(raw))
+        ? (raw as Record<string, unknown>)
+        : {};
+      const bypass = req.bypass !== false; // default ON
+      if (bypass !== brainBypass) {
+        brainBypass = bypass;
+        // Retire IDLE claude-pty brains so the next spawn picks up the new
+        // bypass flag (non-pty brains are unaffected).
+        for (const [workspaceId, entry] of [...managers]) {
+          if (entry.vendor === 'claude-pty' && entry.manager.getStatus().status !== 'busy') {
+            entry.manager.dispose();
+            managers.delete(workspaceId);
+            forgetAmbient(workspaceId);
+            emitBrainPty(workspaceId, null);
+          }
+        }
+      }
+      return { ok: true, bypass };
     }),
   );
 

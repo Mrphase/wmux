@@ -278,6 +278,20 @@ export function CommanderViewContent({
             input surface has no meaning, and the rail below it is what the
             operator opens instead. */}
         <div className="flex flex-col flex-1 min-h-0 px-3 py-2">
+          {/* OK 사용 (Activate Orchestrator) button — one-click start without
+              requiring text input. Sends a default activation prompt. */}
+          {!brainBusy && (
+            <div className="flex items-center gap-2 pb-2 shrink-0">
+              <button
+                type="button"
+                data-commander-ok-activate
+                onClick={() => void onSubmit(t('deck.orchestratorActivatePrompt') || 'Start orchestrating my agents.', [])}
+                className={`px-3 py-1.5 rounded-md text-[11px] font-medium bg-[var(--accent-amber)] text-[var(--bg-base)] hover:opacity-90 transition-opacity ${FOCUS_RING}`}
+              >
+                {t('deck.orchestratorActivate') || 'OK 사용'}
+              </button>
+            </div>
+          )}
           <BrainTerminalEmbed ptyId={brainPtyId} />
         </div>
 
@@ -525,6 +539,19 @@ export function CommanderViewContent({
         style={{ borderColor: 'var(--border-soft)' }}
         {...tokenAttrs('bgSurface', 'border')}
       >
+        {/* OK 사용 button — activate orchestrator without typing. */}
+        {!brainBusy && (
+          <div className="flex items-center gap-2 px-3 pt-2">
+            <button
+              type="button"
+              data-commander-ok-activate
+              onClick={() => void onSubmit(t('deck.orchestratorActivatePrompt') || 'Start orchestrating my agents.', [])}
+              className={`px-3 py-1.5 rounded-md text-[11px] font-medium bg-[var(--accent-amber)] text-[var(--bg-base)] hover:opacity-90 transition-opacity ${FOCUS_RING}`}
+            >
+              {t('deck.orchestratorActivate') || 'OK 사용'}
+            </button>
+          </div>
+        )}
         <ComposerContent
           channelId={COMMANDER_CHANNEL_NAME}
           onSubmit={onSubmit}

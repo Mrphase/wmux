@@ -281,6 +281,11 @@ export const ko = {
   'settings.orchestratorFullPower': '풀파워 모드',
   'settings.orchestratorFullPowerDesc':
     'Claude Code의 스킬·CLAUDE.md·훅을 agent 턴에 로드합니다. 개인 훅이 agent 턴 안에서 실행되고(wmux 샌드박스 밖의 본인 코드), 툴 호출이 느려질 수 있으며, 켜져 있는 동안 agent는 메모리 노트를 쓸 수 없습니다. 다음 agent 턴부터 적용됩니다.',
+  'settings.orchestratorBypass': '바이패스 모드 (권한 생략)',
+  'settings.orchestratorBypassDesc':
+    'Claude Code 오케스트레이터를 --dangerously-skip-permissions로 실행하여 도구 실행 시 승인 프롬프트 없이 동작합니다. 자율 오케스트레이션에 권장됩니다. 다음 브레인 스폰부터 적용됩니다.',
+  'settings.orchestratorHermesNote':
+    'Hermes Agent (ACP)는 실험적입니다. 이 모드를 선택하기 전에 Hermes CLI가 설치되어 있고 인증되어 있는지 확인하세요.',
   // 워크스페이스별 agent 모드 — 단일 자율성 노브(off/assist/auto).
   'deck.limit.window': '사용량',
   'deck.brainTerminal': '브레인 터미널',
@@ -837,6 +842,8 @@ export const ko = {
   'deck.commanderPlaceholder': 'agent에 지시하거나 @로 pane을 멘션…',
   'deck.commanderEmpty':
     'agent에게 에이전트 운영을 맡기거나, @로 에이전트 pane을 멘션해 직접 지시하세요.',
+  'deck.orchestratorActivate': 'OK 사용',
+  'deck.orchestratorActivatePrompt': '에이전트 오케스트레이션 시작.',
   'deck.jumpToPane': '이 pane으로 이동',
   // Bridge P2① — agent 스레드 위에 고정되는 에이전트 명단.
   'deck.fleetLabel': '에이전트',

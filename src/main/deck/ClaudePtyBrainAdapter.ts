@@ -514,6 +514,8 @@ export function buildBrainLaunchCommand(opts: {
   resumeSessionId?: string | null;
   /** Model override (`--model`), or empty/absent for the CLI default. */
   model?: string | null;
+  /** Launch with `--dangerously-skip-permissions` (bypass mode). */
+  bypass?: boolean;
   /** Host platform the command will be wrapped for. Injected by tests. */
   platform?: NodeJS.Platform;
 }): string {
@@ -535,6 +537,9 @@ export function buildBrainLaunchCommand(opts: {
   // The orchestrator's model picker applies to this brain too: the TUI takes
   // the same `--model <alias|full-name>` flag the SDK adapter's option maps to.
   if (opts.model) parts.push('--model', q(opts.model));
+  // Bypass mode: skip per-tool approval prompts so the orchestrator runs
+  // autonomously. Default ON in the UI (Settings checkbox).
+  if (opts.bypass) parts.push('--dangerously-skip-permissions');
   if (opts.resumeSessionId) parts.push('--resume', q(opts.resumeSessionId));
   const line = parts.join(' ');
   return isWindows ? `& ${line}` : line;
@@ -558,6 +563,10 @@ export interface ClaudePtyBrainAdapterDeps {
   /** Model override from the deck's model picker (`--model`). Empty/absent
    *  leaves the TUI on whatever model the user's claude defaults to. */
   model?: string;
+  /** Launch with --dangerously-skip-permissions (bypass mode). Default true
+   *  in production (the Settings checkbox); the adapter passes it through to
+   *  buildBrainLaunchCommand. */
+  bypass?: boolean;
   /** Absolute path to the user's claude binary. Defaults to the resolver. */
   claudeExecutable?: string | null;
   /** Absolute path to the wmux MCP stdio bundle. Defaults to the resolver. */
@@ -1006,6 +1015,7 @@ export class ClaudePtyBrainAdapter implements BrainAdapter {
       mcpConfigPath,
       resumeSessionId,
       ...(this.deps.model ? { model: this.deps.model } : {}),
+      ...(this.deps.bypass ? { bypass: true } : {}),
     });
     // Held locally as well as on the instance: a dispose() racing this spawn
     // nulls the field (killPty), and awaiting the field would then throw

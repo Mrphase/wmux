@@ -377,6 +377,11 @@ export const en = {
   'settings.orchestratorFullPower': 'Full-power mode',
   'settings.orchestratorFullPowerDesc':
     'Load your Claude Code skills, CLAUDE.md and hooks into orchestrator turns. Your hooks run inside brain turns (your own code, outside any wmux sandbox), tool calls may get slower, and the brain cannot write its memory notes while this is on. Applies from the next brain turn.',
+  'settings.orchestratorBypass': 'Bypass mode (skip permissions)',
+  'settings.orchestratorBypassDesc':
+    'Launch the Claude Code orchestrator with --dangerously-skip-permissions so it runs tools without per-action approval prompts. Recommended for autonomous orchestration. Applies from the next brain spawn.',
+  'settings.orchestratorHermesNote':
+    'Hermes Agent (ACP) is experimental. Ensure the Hermes CLI is installed and authenticated before selecting this mode.',
   // D2 — role → agent/model enforcement editor (Settings › Orchestrator).
   'settings.roleBindings': 'Role → model enforcement',
   'settings.roleBindingsDesc':
@@ -990,6 +995,8 @@ export const en = {
   'deck.commanderPlaceholder': 'Tell the orchestrator, or @mention panes…',
   'deck.commanderEmpty':
     'Ask the orchestrator to run your agents, or @mention agent panes to command them directly.',
+  'deck.orchestratorActivate': 'OK 사용',
+  'deck.orchestratorActivatePrompt': 'Start orchestrating my agents.',
   'deck.jumpToPane': 'Jump to this pane',
   // Bridge P2① — Fleet roster pinned above the orchestrator thread.
   'deck.fleetLabel': 'Fleet',

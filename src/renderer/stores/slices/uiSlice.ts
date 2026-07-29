@@ -184,6 +184,12 @@ export interface UISlice {
   deckBrainVendor: import('../../../shared/types').BrainVendor;
   setDeckBrainVendor: (vendor: import('../../../shared/types').BrainVendor) => void;
 
+  // Bypass mode for the claude-pty orchestrator: when checked (default ON),
+  // the TUI brain launches with --dangerously-skip-permissions so it runs
+  // without per-tool approval prompts. Persisted in renderer state.
+  deckBrainBypass: boolean;
+  setDeckBrainBypass: (enabled: boolean) => void;
+
   // Whether the deck shows the Channels tab (the human channel UI). Default
   // OFF: the orchestrator is the single interface and channels are its
   // internal wiring (PRD §4.1 — human channel UI frozen); the tab stays
@@ -883,6 +889,12 @@ export const createUISlice: StateCreator<StoreState, [['zustand/immer', never]],
 
   setDeckBrainVendor: (vendor) => set((state) => {
     state.deckBrainVendor = vendor;
+  }),
+
+  deckBrainBypass: true,
+
+  setDeckBrainBypass: (enabled) => set((state) => {
+    state.deckBrainBypass = enabled;
   }),
 
   channelsTabVisible: false,

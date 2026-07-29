@@ -715,6 +715,8 @@ export const createWorkspaceSlice: StateCreator<StoreState, [['zustand/immer', n
         data.deckBrainVendor === 'hermes' || data.deckBrainVendor === 'claude-pty'
           ? data.deckBrainVendor
           : 'claude';
+      // Bypass mode — default ON, only an explicit false disables it.
+      state.deckBrainBypass = data.deckBrainBypass !== false;
       // Fail closed to hidden: only an explicit boolean shows the (frozen)
       // human channel UI.
       if (typeof data.channelsTabVisible === 'boolean') {

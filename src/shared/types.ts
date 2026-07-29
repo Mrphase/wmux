@@ -622,6 +622,8 @@ export interface SessionData {
   /** Orchestrator brain vendor (BYOB M0). Absent/'claude' = the Claude SDK
    *  brain; 'hermes' = the generic ACP adapter configured for Hermes Agent. */
   deckBrainVendor?: BrainVendor;
+  /** Bypass mode for claude-pty: --dangerously-skip-permissions. Default true. */
+  deckBrainBypass?: boolean;
   /** Whether the deck shows the Channels tab (human channel UI). Default
    *  false — the orchestrator is the single interface; the tab is an
    *  opt-in inspection surface (Settings). */

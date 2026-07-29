@@ -159,6 +159,10 @@ export const IPC = {
   //                   turn path consults it, idle stale-vendor brains retire
   //                   on change, renderer pushes on change + after hydration.
   DECK_BRAIN_VENDOR_SET: 'deck:brainvendor:set',
+  //   DECK_BRAIN_BYPASS_SET (invoke) renderer → main: sync the bypass mode
+  //                   toggle (--dangerously-skip-permissions for claude-pty).
+  //                   Same main-authority pattern as the vendor/fullpower IPC.
+  DECK_BRAIN_BYPASS_SET: 'deck:brainbypass:set',
   //   DECK_BRAIN_PTY  (send) main → renderer: the `claude-pty` brain just
   //                   spawned its interactive TUI in daemon session <ptyId>.
   //                   One-way and additive to DECK_STREAM (which carries only

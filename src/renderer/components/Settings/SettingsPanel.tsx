@@ -791,6 +791,8 @@ function OrchestratorSection() {
   const setDeckBrainFullPower = useStore((s) => s.setDeckBrainFullPower);
   const deckBrainVendor = useStore((s) => s.deckBrainVendor);
   const setDeckBrainVendor = useStore((s) => s.setDeckBrainVendor);
+  const deckBrainBypass = useStore((s) => s.deckBrainBypass);
+  const setDeckBrainBypass = useStore((s) => s.setDeckBrainBypass);
   const channelsTabVisible = useStore((s) => s.channelsTabVisible);
   const setChannelsTabVisible = useStore((s) => s.setChannelsTabVisible);
   // Global auto-wake switch — persisted in MAIN (deck-autowake.json) because
@@ -859,48 +861,102 @@ function OrchestratorSection() {
       ? t(o.labelKey)
       : o.value.charAt(0).toUpperCase() + o.value.slice(1),
   }));
+
+  // ── Vendor tab definitions ─────────────────────────────────────────────
+  const vendorTabs: { id: typeof deckBrainVendor; label: string }[] = [
+    { id: 'claude', label: t('settings.orchestratorBrainClaude') },
+    { id: 'claude-pty', label: t('settings.orchestratorBrainClaudePty') },
+    { id: 'hermes', label: t('settings.orchestratorBrainHermes') },
+  ];
+
   return (
     <div className="flex flex-col gap-3 mt-4" data-testid="orchestrator-section">
       <SectionLabel label={t('settings.orchestrator')} />
-      <SettingRow
-        label={t('settings.orchestratorBrain')}
-        description={t('settings.orchestratorBrainDesc')}
-      >
-        <SettingSelect
-          value={deckBrainVendor}
-          onChange={(v) =>
-            setDeckBrainVendor(v === 'hermes' || v === 'claude-pty' ? v : 'claude')
-          }
-          options={[
-            { value: 'claude', label: t('settings.orchestratorBrainClaude') },
-            { value: 'claude-pty', label: t('settings.orchestratorBrainClaudePty') },
-            { value: 'hermes', label: t('settings.orchestratorBrainHermes') },
-          ]}
-          label={t('settings.orchestratorBrain')}
-        />
-      </SettingRow>
-      <SettingRow
-        label={t('settings.orchestratorModel')}
-        description={t('settings.orchestratorModelDesc')}
-      >
-        <SettingSelect
-          value={deckBrainModel}
-          onChange={setDeckBrainModel}
-          options={options}
-          label={t('settings.orchestratorModel')}
-        />
-      </SettingRow>
-      <RoleBindingEditor />
-      <SettingRow
-        label={t('settings.orchestratorFullPower')}
-        description={t('settings.orchestratorFullPowerDesc')}
-      >
-        <Toggle
-          checked={deckBrainFullPower}
-          onChange={setDeckBrainFullPower}
-          label={t('settings.orchestratorFullPower')}
-        />
-      </SettingRow>
+
+      {/* ── Vendor tabs ──────────────────────────────────────────────── */}
+      <div className="flex gap-0.5 rounded-md overflow-hidden border border-[var(--border-soft)]" data-testid="orchestrator-vendor-tabs">
+        {vendorTabs.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            data-vendor-tab={tab.id}
+            onClick={() => setDeckBrainVendor(tab.id)}
+            className={`flex-1 px-2 py-1.5 text-[11px] transition-colors ${
+              deckBrainVendor === tab.id
+                ? 'bg-[var(--accent-amber)] text-[var(--bg-base)] font-semibold'
+                : 'bg-[var(--bg-surface)] text-[var(--text-muted)] hover:text-[var(--text-main)]'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* ── SDK (Claude) page ────────────────────────────────────── */}
+      {deckBrainVendor === 'claude' && (
+        <div className="flex flex-col gap-3" data-testid="orchestrator-page-sdk">
+          <SettingRow
+            label={t('settings.orchestratorModel')}
+            description={t('settings.orchestratorModelDesc')}
+          >
+            <SettingSelect
+              value={deckBrainModel}
+              onChange={setDeckBrainModel}
+              options={options}
+              label={t('settings.orchestratorModel')}
+            />
+          </SettingRow>
+          <RoleBindingEditor />
+          <SettingRow
+            label={t('settings.orchestratorFullPower')}
+            description={t('settings.orchestratorFullPowerDesc')}
+          >
+            <Toggle
+              checked={deckBrainFullPower}
+              onChange={setDeckBrainFullPower}
+              label={t('settings.orchestratorFullPower')}
+            />
+          </SettingRow>
+        </div>
+      )}
+
+      {/* ── Claude Code (terminal) page ──────────────────────────── */}
+      {deckBrainVendor === 'claude-pty' && (
+        <div className="flex flex-col gap-3" data-testid="orchestrator-page-claude-code">
+          <SettingRow
+            label={t('settings.orchestratorModel')}
+            description={t('settings.orchestratorModelDesc')}
+          >
+            <SettingSelect
+              value={deckBrainModel}
+              onChange={setDeckBrainModel}
+              options={options}
+              label={t('settings.orchestratorModel')}
+            />
+          </SettingRow>
+          <SettingRow
+            label={t('settings.orchestratorBypass')}
+            description={t('settings.orchestratorBypassDesc')}
+          >
+            <Toggle
+              checked={deckBrainBypass}
+              onChange={setDeckBrainBypass}
+              label={t('settings.orchestratorBypass')}
+            />
+          </SettingRow>
+        </div>
+      )}
+
+      {/* ── Hermes page ──────────────────────────────────────────── */}
+      {deckBrainVendor === 'hermes' && (
+        <div className="flex flex-col gap-3" data-testid="orchestrator-page-hermes">
+          <p className="text-[11px] text-[var(--text-muted)] px-1">
+            {t('settings.orchestratorHermesNote')}
+          </p>
+        </div>
+      )}
+
+      {/* ── Shared settings (shown on all pages) ─────────────────── */}
       <SettingRow
         label={t('settings.autoWake')}
         description={t('settings.autoWakeDesc')}
