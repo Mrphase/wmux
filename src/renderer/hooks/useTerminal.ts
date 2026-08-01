@@ -24,6 +24,7 @@ import { attachImeStormGuard } from '../terminal/imeStormGuard';
 import { webglContextPool } from '../terminal/webglContextPool';
 import { teardownWebglAddon } from '../terminal/webglTeardown';
 import { createGlyphRepaintScheduler, type GlyphRepaintScheduler } from '../terminal/glyphRepaint';
+import { attachAtlasMergeHeal } from '../terminal/atlasMergeHeal';
 import { createDeadInputWatchdog } from '../terminal/deadInputWatchdog';
 import { awaitParseBarrier } from '../terminal/parseBarrier';
 import { STALE_REPLAY_INPUT_MODE_RESETS, STALE_REPLAY_DISPLAY_RESETS } from '../terminal/staleReplayModeReset';
@@ -564,6 +565,10 @@ export function useTerminal(containerRef: React.RefObject<HTMLDivElement | null>
   if (!webglTokenRef.current) webglTokenRef.current = `wgl-${++webglTokenSeq}`;
   // Pending deferred-WebGL-release timer (see WEBGL_HIDDEN_DISPOSE_DELAY_MS).
   const webglDisposeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Dispose fn for the atlas page-merge self-heal subscription — bound to the
+  // CURRENT addon instance, so every addon teardown path must run it (see
+  // atlasMergeHeal.ts for the corruption class it repairs).
+  const atlasHealDisposeRef = useRef<(() => void) | null>(null);
   // Glyph-corruption repair scheduler (issue #166) — created by the main
   // effect, also poked by the visibility effect on regain.
   const glyphRepaintRef = useRef<GlyphRepaintScheduler | null>(null);
@@ -1059,6 +1064,8 @@ export function useTerminal(containerRef: React.RefObject<HTMLDivElement | null>
           // gone. Dispose, drop to xterm's DOM renderer, and free our pool slot
           // so the pool stops counting us and can re-grant on the next toggle.
           console.warn('[Terminal] WebGL context lost — falling back to DOM renderer');
+          atlasHealDisposeRef.current?.();
+          atlasHealDisposeRef.current = null;
           addon.dispose();
           webglAddonRef.current = null;
           webglContextPool.notifyDisposed(webglTokenRef.current);
@@ -1070,6 +1077,10 @@ export function useTerminal(containerRef: React.RefObject<HTMLDivElement | null>
         });
         terminal.loadAddon(addon);
         webglAddonRef.current = addon;
+        // Atlas page-merge self-heal (2026-08-01 report; see atlasMergeHeal.ts).
+        // Attached per addon instance — every teardown path disposes it.
+        atlasHealDisposeRef.current?.();
+        atlasHealDisposeRef.current = attachAtlasMergeHeal(addon);
       } catch {
         console.warn('WebGL addon failed, using DOM renderer');
         webglAddonRef.current = null;
@@ -1082,6 +1093,8 @@ export function useTerminal(containerRef: React.RefObject<HTMLDivElement | null>
     // just loses GPU acceleration until it is granted a context again.
     function disposeWebgl() {
       if (!webglAddonRef.current) return;
+      atlasHealDisposeRef.current?.();
+      atlasHealDisposeRef.current = null;
       teardownWebglAddon(webglAddonRef.current);
       webglAddonRef.current = null;
       try {
@@ -1154,6 +1167,8 @@ export function useTerminal(containerRef: React.RefObject<HTMLDivElement | null>
         // recreating — this runs once per terminal on mount, so on a multi-pane
         // restore it is a burst of dispose+create pairs; leaking the old
         // contexts here is a prime zombie-context source.
+        atlasHealDisposeRef.current?.();
+        atlasHealDisposeRef.current = null;
         teardownWebglAddon(webglAddonRef.current);
         webglAddonRef.current = null;
         loadWebgl();
@@ -2059,6 +2074,8 @@ export function useTerminal(containerRef: React.RefObject<HTMLDivElement | null>
       // fonts.ready atlas rebuild firing during teardown) — it must loseContext
       // too, not just dispose, or unmount churn leaks zombie contexts (#191 / #197).
       webglContextPool.release(webglTokenRef.current);
+      atlasHealDisposeRef.current?.();
+      atlasHealDisposeRef.current = null;
       if (webglAddonRef.current) {
         teardownWebglAddon(webglAddonRef.current);
         webglAddonRef.current = null;
