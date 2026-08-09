@@ -22,6 +22,12 @@ interface PaneContainerProps {
   isZoomHidden?: boolean;
 }
 
+/** Saved pane sizes are percentages; Panel interprets a numeric prop as pixels. */
+export function panelDefaultPercentSize(size: number | undefined, fallback: number): string {
+  const percent = typeof size === 'number' && Number.isFinite(size) ? size : fallback;
+  return `${percent}%`;
+}
+
 export default function PaneContainer({ pane, workspace, isWorkspaceVisible = true, isZoomHidden = false }: PaneContainerProps) {
   const activePaneId = useStore((s) => {
     const ws = s.workspaces.find((w) => w.id === s.activeWorkspaceId);
@@ -164,8 +170,11 @@ export default function PaneContainer({ pane, workspace, isWorkspaceVisible = tr
             )}
             <Panel
               id={child.id}
-              defaultSize={pane.sizes?.[i] ?? 100 / pane.children.length}
-              minSize={10}
+              defaultSize={panelDefaultPercentSize(
+                pane.sizes?.[i],
+                100 / pane.children.length,
+              )}
+              minSize="10%"
               {...(zoomHidden ? { 'data-wmux-zoom-hidden': true } : {})}
             >
               <PaneContainer

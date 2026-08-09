@@ -82,6 +82,25 @@ describe('HeadlessSnapshot — fidelity round-trips', () => {
     await expectRoundTrip(bytes, 40, 10);
   });
 
+  it('rebuilds ordinary scrollback at the current width instead of preserving old wrapped rows', async () => {
+    // This line wraps at 80 columns but fits at 120. A resize resync feeds the
+    // raw history into a fresh terminal at the latter geometry, so it must not
+    // retain the former physical-row split.
+    const logicalLine = 'abcdefghij'.repeat(11);
+    const raw = Buffer.from(`${logicalLine}\r\n`);
+    const oldWidth = await referenceTerminal(raw, 80, 10);
+    expect(bufferText(oldWidth).filter((line) => line !== '')).toHaveLength(2);
+
+    const snapshot = await generateSnapshot({ cols: 120, rows: 10, initial: raw });
+    expect(snapshot.ok).toBe(true);
+    if (!snapshot.ok) return;
+    const restored = await restoredTerminal(snapshot.payload, 120, 10);
+    expect(bufferText(restored).filter((line) => line !== '')).toEqual([logicalLine]);
+
+    oldWidth.dispose();
+    restored.dispose();
+  });
+
   it('restores bracketed-paste mode', async () => {
     const res = await generateSnapshot({
       cols: 80,

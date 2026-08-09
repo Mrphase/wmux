@@ -27,7 +27,7 @@ vi.mock('../Pane', () => ({
     React.createElement('div', { 'data-testid': `leaf-${pane.id}` }),
 }));
 
-import PaneContainer from '../PaneContainer';
+import PaneContainer, { panelDefaultPercentSize } from '../PaneContainer';
 import { useStore } from '../../../stores';
 import { getLeafPanes } from '../../../../shared/paneUtils';
 
@@ -88,6 +88,11 @@ afterEach(() => {
 });
 
 describe('PaneContainer — rendering a moved layout (#645)', () => {
+  it('treats persisted pane sizes as percentages, not pixel values', () => {
+    expect(panelDefaultPercentSize(52.611, 50)).toBe('52.611%');
+    expect(panelDefaultPercentSize(undefined, 50)).toBe('50%');
+  });
+
   it('swapping two panes exchanges their DOM slots and keeps both mounted', () => {
     const [a, b, c] = renderedLeafOrder();
     expect([a, b, c]).toHaveLength(3);

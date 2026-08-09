@@ -1026,7 +1026,7 @@ function SplitSurfaceView({
     <div className="flex-1 relative overflow-hidden">
       <Group orientation="horizontal" className="h-full w-full" resizeTargetMinimumSize={{ coarse: 37, fine: 16 }}>
         {/* Terminal panel */}
-        <Panel defaultSize={50} minSize={20}>
+        <Panel defaultSize="50%" minSize="20%">
           <div className="h-full w-full relative overflow-hidden">
             {terminals.map((surface) => (
               <TerminalComponent
@@ -1048,7 +1048,7 @@ function SplitSurfaceView({
         <Separator className="w-1.5 bg-[var(--bg-surface)] hover:bg-[var(--accent-blue)] transition-colors cursor-col-resize" />
 
         {/* Browser panel */}
-        <Panel defaultSize={50} minSize={20}>
+        <Panel defaultSize="50%" minSize="20%">
           <div className="h-full w-full relative overflow-hidden">
             {browsers.map((surface) => (
               <BrowserPanel

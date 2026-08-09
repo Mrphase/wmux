@@ -407,6 +407,19 @@ export async function hydrateTerminalForRead(ptyId: string): Promise<void> {
 // the pool's accounting must treat them as distinct slots.
 let webglTokenSeq = 0;
 
+// Restored Windows workspaces can leave stale WebGL frames visible after a pane
+// changes size. The DOM renderer is slower but redraws cells deterministically.
+const WEBGL_RENDERER_ENABLED = false;
+
+// xterm enables ConPTY scrollback reflow at build 21376 and above. Reflow
+// recombines recovered soft-wrapped rows after a pane resize, which corrupts
+// human-readable terminal history. Advertise the compatibility threshold just
+// below that gate to retain physical rows while still resizing the live PTY.
+const CONPTY_BUILD_WITHOUT_REFLOW = 21_375;
+
+/** Wait for splitter dragging to settle before rebuilding scrollback at its new geometry. */
+export const RESIZE_RESYNC_DEBOUNCE_MS = 350;
+
 // RCA (2026-05-29 view-switch lag): when a terminal is hidden we DEFER releasing
 // its WebGL context (back to the shared pool) by this delay instead of freeing
 // it immediately. A hidden terminal usually reappears within seconds (workspace
@@ -873,14 +886,10 @@ export function useTerminal(containerRef: React.RefObject<HTMLDivElement | null>
       theme: xtermTheme,
       minimumContrastRatio,
       allowProposedApi: true,
-      // Enable xterm 6's Windows-aware ConPTY reflow path. ConPTY emits
-      // spurious row-change events on resize; the dedicated reflow logic
-      // suppresses them, which in turn keeps SelectionService from
-      // unconditionally clearing the user's selection mid-drag.
-      // macOS/Linux PTY는 ConPTY가 아니므로 이 reflow 경로를 켜면 오히려
-      // focus/resize 시 줄바꿈이 어긋나 글자가 깨진다(좌측 팬 garble). win32 한정.
+      // Keep ConPTY's physical rows intact across resize. Reflowing restored
+      // history combines wrapped rows and makes code/log output unreadable.
       ...(window.electronAPI.platform === 'win32'
-        ? { windowsPty: { backend: 'conpty' as const, buildNumber: 21376 } }
+        ? { windowsPty: { backend: 'conpty' as const, buildNumber: CONPTY_BUILD_WITHOUT_REFLOW } }
         : {}),
     });
 
@@ -1072,6 +1081,7 @@ export function useTerminal(containerRef: React.RefObject<HTMLDivElement | null>
     // count without any pane going blank. loadWebgl is the pool's "acquire"
     // callback; disposeWebgl is its "evict" callback (reverts to DOM renderer).
     function loadWebgl() {
+      if (!WEBGL_RENDERER_ENABLED) return;
       if (webglAddonRef.current) return; // already loaded
       try {
         const addon = new WebglAddon();
@@ -1222,6 +1232,49 @@ export function useTerminal(containerRef: React.RefObject<HTMLDivElement | null>
     let lastSentCols = 0;
     let lastSentRows = 0;
     let resizeDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+    let resizeResyncTimer: ReturnType<typeof setTimeout> | null = null;
+    let resizeResyncSequence = 0;
+
+    // xterm's local reflow mutates restored physical rows, which can combine
+    // terminal output that was originally wrapped at a different width. After
+    // the daemon has accepted the settled geometry, rebuild from its raw ring
+    // through the existing snapshot protocol instead. It preserves live input
+    // and declines to snapshot TUI states it cannot reproduce faithfully.
+    const scheduleResizeResync = (targetPtyId: string, cols: number, rows: number) => {
+      if (!isDaemonModeActive()) return;
+      const sequence = ++resizeResyncSequence;
+      if (resizeResyncTimer) clearTimeout(resizeResyncTimer);
+      resizeResyncTimer = setTimeout(() => {
+        resizeResyncTimer = null;
+        const liveTerm = terminalRef.current;
+        if (
+          sequence !== resizeResyncSequence ||
+          liveTerm !== terminal ||
+          ptyIdRef.current !== targetPtyId ||
+          !isVisibleRef.current ||
+          liveTerm.cols !== cols ||
+          liveTerm.rows !== rows
+        ) {
+          return;
+        }
+        // Await the daemon RPC: its session metadata supplies the snapshot
+        // geometry, so the reflush must begin only after resizeSession resolves.
+        window.electronAPI.pty.resize(targetPtyId, cols, rows).then(() => {
+          if (
+            sequence !== resizeResyncSequence ||
+            terminalRef.current !== terminal ||
+            ptyIdRef.current !== targetPtyId ||
+            !isVisibleRef.current
+          ) {
+            return;
+          }
+          void startResync('resize-layout');
+        }).catch((err: unknown) => {
+          const message = err instanceof Error ? err.message : String(err);
+          console.warn(`[useTerminal] resize snapshot skipped ptyId=${targetPtyId}: ${message}`);
+        });
+      }, RESIZE_RESYNC_DEBOUNCE_MS);
+    };
 
     // The container-resize fit, extracted so the selection-release retry below
     // runs the SAME path — including scroll preservation and sendResize —
@@ -1278,6 +1331,7 @@ export function useTerminal(containerRef: React.RefObject<HTMLDivElement | null>
           lastSentCols = cols;
           lastSentRows = rows;
           sendResize(currentPtyId, cols, rows);
+          scheduleResizeResync(currentPtyId, cols, rows);
         }
       } catch {
         // ignore fit errors during unmount
@@ -2108,6 +2162,7 @@ export function useTerminal(containerRef: React.RefObject<HTMLDivElement | null>
 
     return () => {
       if (resizeDebounceTimer) clearTimeout(resizeDebounceTimer);
+      if (resizeResyncTimer) clearTimeout(resizeResyncTimer);
       if (pendingFitRaf !== null) cancelAnimationFrame(pendingFitRaf);
       if (isMac) { container.removeEventListener('paste', blockNativePaste, true); }
       terminal.textarea?.removeEventListener('focus', onTextareaFocus);
