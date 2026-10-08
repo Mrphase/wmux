@@ -690,18 +690,19 @@ select option {
 
 /* Custom scrollbar */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
 }
 ::-webkit-scrollbar-track {
-  background: transparent;
+  background: var(--bg-mantle);
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--bg-surface);
-  border-radius: 3px;
+  background: var(--text-muted);
+  border: 2px solid var(--bg-mantle);
+  border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--bg-overlay);
+  background: var(--text-sub);
 }
 ::-webkit-scrollbar-corner {
   background: transparent;
@@ -719,24 +720,28 @@ select option {
      real auto-hide mechanism — opacity alone was a red herring). Force it. */
   visibility: visible !important;
 }
-/* Thin the Monaco bar (default 14px) down to the 6px the rest of the UI uses. */
+/* Keep xterm's scrollbar distinct and easy to grab in dense multi-pane workspaces. */
 .xterm .xterm-scrollable-element > .scrollbar.vertical,
 .xterm .xterm-scrollable-element > .scrollbar.vertical > .slider {
-  width: 6px !important;
+  width: 10px !important;
+}
+.xterm .xterm-scrollable-element > .scrollbar.vertical {
+  background: var(--bg-mantle) !important;
 }
 .xterm .xterm-scrollable-element > .scrollbar.invisible {
   opacity: 1 !important;
   pointer-events: auto !important;
 }
 .xterm .xterm-scrollable-element > .scrollbar > .slider {
-  /* Same colour as the rest of the UI's scrollbar (the ::-webkit-scrollbar above).
-     The real bug was the inline visibility:hidden, NOT the colour. */
+  /* Use a high-contrast thumb: the old surface-on-surface slider was too easy
+     to miss against a dark terminal background. */
   visibility: visible !important;
-  background: var(--bg-surface) !important;
-  border-radius: 3px;
+  background: var(--text-muted) !important;
+  border: 2px solid var(--bg-mantle);
+  border-radius: 5px;
 }
 .xterm .xterm-scrollable-element > .scrollbar > .slider:hover {
-  background: var(--bg-overlay) !important;
+  background: var(--text-sub) !important;
 }
 
 /* IME composition overflow guard (#678). xterm anchors its hidden IME helper
