@@ -44,3 +44,13 @@ npm run package     # -> out\wmux-win32-arm64
 ```
 
 (Upgrading Node to >= 22.12 removes the need for NODE_OPTIONS.)
+
+## Deploy (side-by-side)
+
+- Installed to `%LOCALAPPDATA%\wmux\app-4.1.0-hamoa`; `~\.local\bin\wmux-latest.cmd` points there.
+- `app-3.40.2-main` is untouched. Backups of `session.json`, `~\.wmux\sessions.json` and the old
+  launcher: `~\.codex\backups\wmux-v4-upgrade-<timestamp>`.
+- Rollback: quit wmux, restore the `.cmd` and the two JSON files from the backup, relaunch.
+- Known on this machine: several upstream test files (worktask, fan-out, worktree, win32Probe,
+  some runtime tests) fail or flake here on clean `origin/main` too (Windows temp-dir locks,
+  `AttachConsole failed`); not caused by local commits.
