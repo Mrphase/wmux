@@ -36,6 +36,7 @@ import { agentSupportsPermissionFlag, normalizeResumeCwd, permissionFlagFor, res
 import { applyRoleBinding, type RoleBinding } from '../../../shared/orchestratorRole';
 import { CHATV2_PROVIDER_SESSION_ID } from '../../../shared/chatv2/ipc';
 import { ResumeInfoChipGate } from './ResumeInfoChip';
+import { CwdRecoveryChipGate } from './CwdRecoveryChip';
 import { tokenAttrs } from '../../themes';
 import PaneDecorations from '../../plugins/PaneDecorations';
 import { isRemoteMirrorVisible } from '../../stores/slices/remoteWorkspacesSlice';
@@ -659,6 +660,11 @@ export default function PaneComponent({ pane, workspace, isActive, isWorkspaceVi
   const resumePtyReady = useStore((s) =>
     activeSurfacePtyId ? !!s.ptyReadyByPtyId[activeSurfacePtyId] : false,
   );
+  // Network-share fallback (CwdRecoveryChip) — owns the top-left chip slot
+  // until the pane is back in its directory; a resume belongs there anyway.
+  const hasCwdFallback = useStore((s) =>
+    activeSurfacePtyId ? !!s.cwdFallbackByPtyId[activeSurfacePtyId] : false,
+  );
   // A chat-v2 conversation that still owns this pane (not handed off) must not
   // be offered for resume in the anchor shell: that would put a second writer
   // on the same conversation. Asked only for panes that offer a resume.
@@ -853,7 +859,13 @@ export default function PaneComponent({ pane, workspace, isActive, isWorkspaceVi
           recovery pill flow above (the pill takes precedence right after a
           reboot). Reveals the conversation UUID and types the exact resume
           command into this pane on 복구. */}
-      {resumeBinding && !resumeHint && activeSurfacePtyId && !chatV2OwnsPane && (
+      {activeSurfacePtyId && hasCwdFallback && (
+        <CwdRecoveryChipGate
+          ptyId={activeSurfacePtyId}
+          shell={pane.surfaces.find((s) => s.id === pane.activeSurfaceId)?.shell}
+        />
+      )}
+      {resumeBinding && !resumeHint && !hasCwdFallback && activeSurfacePtyId && !chatV2OwnsPane && (
         <ResumeInfoChipGate
           ptyId={activeSurfacePtyId}
           binding={resumeBinding}

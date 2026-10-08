@@ -181,7 +181,7 @@ export default function TerminalComponent({ chatView = false, ptyId: externalPty
       : 'global';
     const requestedCwd = deadPaneRecovery?.spawnCwd ?? deadPaneRecovery?.cwd ?? respawnCwd;
     console.log(`[Terminal] self-create PTY: shell=${shell}, cwd=${requestedCwd ?? '(home)'} source=${cwdSource} surfaceCwd=${cwd ?? '-'} cols=${cols}, rows=${rows}, ws=${workspaceId}, surface=${surfaceId ?? '-'}`);
-    void ipcInvokeRef.current<{ id: string; cwd?: string }>(() =>
+    void ipcInvokeRef.current<{ id: string; cwd?: string; cwdFallbackFrom?: string }>(() =>
       window.electronAPI.pty.create(withWorkspaceProfile(withDefaultShell({
         shell,
         ...(deadPaneRecovery
@@ -215,6 +215,10 @@ export default function TerminalComponent({ chatView = false, ptyId: externalPty
       }
       setPtyId(result.data.id);
       onPtyCreated?.(result.data.id);
+      // Main fell back from a network share — offer the one-click `cd` back.
+      if (result.data.cwdFallbackFrom) {
+        useStore.getState().setCwdFallback(result.data.id, result.data.cwdFallbackFrom);
+      }
       // Heal the surface's tracked cwd to what main actually spawned in, so a
       // contaminated-home surface.cwd is corrected the moment it respawns and a
       // later split seeds from the real dir (issue #515). onPtyCreated binds the

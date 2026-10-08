@@ -1045,6 +1045,14 @@ export interface DaemonCreateSessionParams {
   /** Absent means the home directory. */
   cwd?: string;
   /**
+   * The directory the pane was MEANT to start in, when main had to fall back
+   * (an untrusted or not-yet-reachable network share). Persisted on the
+   * session as `cwdFallbackFrom` so a later recovery retries the original
+   * path and the renderer can offer a one-click `cd` back. Absent → no
+   * fallback happened (today's behaviour).
+   */
+  cwdFallbackFrom?: string;
+  /**
    * Absent means the daemon's configured default shell. Omit it to get the
    * default; do not send `''`, which only works by accident.
    */

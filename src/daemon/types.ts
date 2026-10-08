@@ -101,6 +101,14 @@ export interface DaemonSession {
    * recovered session is respawned through `createSession` and gets one.
    */
   spawnCwd?: string;
+  /**
+   * Set when this pane had to start somewhere other than where it was meant
+   * to — a network share (UNC or mapped drive) that was untrusted or not yet
+   * reachable at spawn/recovery time. Holds the intended directory. Recovery
+   * tries it first; the renderer offers a one-click `cd` back while it is set.
+   * Cleared as soon as the pane's live cwd leaves the fallback directory.
+   */
+  cwdFallbackFrom?: string;
   env: Record<string, string>;
   cols: number;
   rows: number;

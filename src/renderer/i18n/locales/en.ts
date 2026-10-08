@@ -961,6 +961,12 @@ export const en = {
   // X6 ② — one-click resume pill on a recovered interactive agent pane.
   'resume.label': 'Resume {agent}',
   'resume.tooltip': 'Resume the previous agent conversation in this pane',
+  'cwdRecovery.label': 'Last directory',
+  'cwdRecovery.tooltip': 'This pane could not start in its network directory — go back to it',
+  'cwdRecovery.explain': 'The network share was not available, so this pane started elsewhere. Last directory:',
+  'cwdRecovery.cd': 'cd there',
+  'cwdRecovery.cdTooltip': 'Type the cd command into this pane and run it',
+  'cwdRecovery.dismiss': 'Dismiss',
   'resume.dismiss': 'Dismiss',
   // X6 ③ — progressive assembly: the first click restores the permission mode
   // (types the command, no Enter); this second click appends the exact-session
@@ -2103,6 +2109,8 @@ export const en = {
   'settings.startupDirectory': 'Starting directory',
   'settings.startupDirectoryDesc': 'New terminals start here. Empty = your home directory. Workspace profiles can override per workspace.',
   'settings.startupDirectoryPlaceholder': 'e.g. C:\\Projects',
+  'settings.trustedCwdRoots': 'Trusted network directories',
+  'settings.trustedCwdRootsDesc': 'Network share roots (\\\\server\\share) terminals may start in, separated by ";". Others are refused and the pane offers a one-click cd back.',
   'settings.splitInheritsCwd': 'Splits inherit directory',
   'settings.splitInheritsCwdDesc': 'A pane created by splitting starts in the original pane\'s current directory.',
   'settings.closeTabOnShellExit': 'Close the tab when its shell exits cleanly',

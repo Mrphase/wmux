@@ -552,6 +552,9 @@ export const IPC = {
   // pty.create can inject `wsl.exe -d <distro>` at the shell-resolution
   // choke point without threading it through every create call.
   SETTINGS_DEFAULT_WSL_DISTRO: 'settings:default-wsl-distro',
+  // Renderer → main mirror of the trusted network-share roots (UNC) that
+  // pty.create may use as a working directory.
+  SETTINGS_TRUSTED_CWD_ROOTS: 'settings:trusted-cwd-roots',
   // Phase 2.2 — MCP plugin permission approval (main → renderer subscribe,
   // renderer → main response). Emitted when the enforcer rejects an
   // unconfirmed plugin in enforce mode and the ApprovalQueue mints a

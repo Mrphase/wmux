@@ -35,6 +35,7 @@ import { createOpenCodeDecisions } from './approvals/openCodeDecisions';
 import { isNativeDecision } from './approvals/types';
 import { SCROLLBACK_ROWS } from './web/hostSearch';
 import { recoveryCwd, isWslShell, isWslCwdMissingError } from '../shared/wsl';
+import { isPlausibleCwd } from '../shared/cwdShape';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
@@ -1131,6 +1132,56 @@ function recoveryCwdLogged(session: { id?: string; cmd: string; cwd: string }): 
   return cwd;
 }
 
+/**
+ * Network shares (UNC) whose root did not answer during this boot's recovery.
+ * Keyed by `\\server\share` so one dead share costs a single bounded wait,
+ * not one per pane.
+ */
+const unreachableShareRoots = new Set<string>();
+
+function uncShareRoot(p: string): string | undefined {
+  const m = /^(\\\\[^\\]+\\[^\\]+)/.exec(p);
+  return m ? m[1].toLowerCase() : undefined;
+}
+
+/**
+ * Recovery cwd for a non-WSL pane whose intended directory may be a network
+ * share. Tries the directory the pane was meant to be in (a recorded
+ * fallback origin, else its last live cwd); a UNC share that is not up yet
+ * after boot gets a bounded async wait (~6 s, once per share root) before
+ * recovery gives up on it. Returns the cwd to spawn in plus, when it is not
+ * the intended one, the intended directory to keep as `cwdFallbackFrom`.
+ */
+async function recoveryCwdForShare(
+  session: { id?: string; cmd: string; cwd: string; cwdFallbackFrom?: string },
+): Promise<{ cwd: string; cwdFallbackFrom?: string }> {
+  if (isWslShell(session.cmd)) return { cwd: recoveryCwdLogged(session) };
+  const intended = session.cwdFallbackFrom || session.cwd;
+  const root = uncShareRoot(intended);
+  // Local paths keep upstream behaviour: a deleted local directory is gone,
+  // not "not up yet", so there is nothing to wait for or offer back.
+  if (!root) return { cwd: recoveryCwdLogged(session) };
+  if (!unreachableShareRoots.has(root)) {
+    const isDir = async () => {
+      try { return (await fs.promises.stat(intended)).isDirectory(); } catch { return false; }
+    };
+    const deadline = Date.now() + 6000;
+    for (;;) {
+      if (await isDir()) return { cwd: intended };
+      if (Date.now() + 2000 >= deadline) break;
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+    }
+    unreachableShareRoots.add(root);
+  }
+  // The share is down: start where the pane can (its last live cwd if that is
+  // a different, reachable directory, else home) and remember the share.
+  const cwd = session.cwd !== intended && !uncShareRoot(session.cwd) && fs.existsSync(session.cwd)
+    ? session.cwd
+    : os.homedir();
+  log('warn', `[recovery] ${session.id ?? 'session'}: network cwd ${JSON.stringify(intended)} unreachable; starting in ${cwd}`);
+  return { cwd, cwdFallbackFrom: intended };
+}
+
 function log(level: string, msg: string, ...args: unknown[]): void {
   const ts = new Date().toISOString();
   console.log(`[${ts}] [daemon/${level}] ${msg}`, ...args);
@@ -1720,6 +1771,14 @@ async function recoverSessions(
   const spoolBindings = readResumeSpoolMap();
   // Read before the automation engine starts and rewrites interrupted runs.
   const automationRunPtyIds = recordedRunPtyIds(wmuxDir);
+  // A pane recovered away from its network share keeps the intended path on
+  // its live meta, so the save below persists it and the renderer can offer
+  // the one-click `cd` back (cwdRecovery chip).
+  const noteCwdFallback = (id: string, from: string | undefined): void => {
+    if (!from) return;
+    const managed = sessionManager.getSession(id);
+    if (managed) managed.meta.cwdFallbackFrom = from;
+  };
 
   // Detect reboot: if bootId changed, all old PIDs are stale — skip kill attempts
   const currentBootId = await getBootId();
@@ -1851,8 +1910,9 @@ async function recoverSessions(
           `[recovery] session ${session.id} dump=${session.bufferDumpPath} exists=${scrollbackData !== undefined} bytes=${scrollbackData?.length ?? 0}`,
         );
 
-        // Verify cwd still exists; fall back to homedir
-        const cwd = recoveryCwdLogged(session);
+        // Verify cwd still exists; fall back to homedir (network shares get a
+        // bounded wait and keep their intended path as cwdFallbackFrom).
+        const { cwd, cwdFallbackFrom } = await recoveryCwdForShare(session);
 
         // ConPTY on Windows occasionally rejects the first spawn after a
         // daemon restart with ERROR_INVALID_PARAMETER (87) — a known
@@ -1935,6 +1995,7 @@ async function recoverSessions(
             sessionManager.emit('session:died', { id: recovered.id, exitCode: null, reason: 'recovery' });
           }
         });
+        noteCwdFallback(recovered.id, cwdFallbackFrom);
 
         // Clean up dump file
         try { fs.unlinkSync(session.bufferDumpPath); } catch { /* ignore */ }
@@ -1965,7 +2026,7 @@ async function recoverSessions(
       if (fs.existsSync(snapshotPath)) {
         try {
           const scrollbackData = fs.readFileSync(snapshotPath);
-          const cwd = recoveryCwdLogged(session);
+          const { cwd, cwdFallbackFrom } = await recoveryCwdForShare(session);
 
           const recovered = await recoverCodexPane(sessionManager, codexPaneRelays, {
             id: session.id,
@@ -2003,6 +2064,7 @@ async function recoverSessions(
             }
           });
 
+          noteCwdFallback(recovered.id, cwdFallbackFrom);
           try { fs.unlinkSync(snapshotPath); } catch { /* ignore */ }
           recoveredIds.add(session.id);
           changed = true;
@@ -2018,7 +2080,7 @@ async function recoverSessions(
       // This handles cases where the daemon was killed before
       // the 30s snapshot interval fired (e.g. immediate reboot).
       try {
-        const cwd = recoveryCwdLogged(session);
+        const { cwd, cwdFallbackFrom } = await recoveryCwdForShare(session);
         const recovered = await recoverCodexPane(sessionManager, codexPaneRelays, {
           id: session.id,
           cmd: session.cmd,
@@ -2054,6 +2116,7 @@ async function recoverSessions(
           }
         });
 
+        noteCwdFallback(recovered.id, cwdFallbackFrom);
         recoveredIds.add(session.id);
         changed = true;
         log('info', `Recovered session ${session.id} without scrollback in ${cwd}`);
@@ -2360,6 +2423,13 @@ function registerRpcHandlers(
         { restart: session.supervision.restart, limit: session.supervision.limit },
         session.supervision.status,
       );
+    }
+    // Remember where the pane was meant to start when main had to fall back
+    // (see DaemonCreateSessionParams.cwdFallbackFrom). Only a plausible
+    // absolute path is kept; it is persisted with the meta below.
+    if (typeof p.cwdFallbackFrom === 'string' && isPlausibleCwd(p.cwdFallbackFrom)) {
+      const created = sessionManager.getSession(session.id);
+      if (created) created.meta.cwdFallbackFrom = p.cwdFallbackFrom;
     }
 
     // Start process monitoring
@@ -2981,9 +3051,10 @@ function registerRpcHandlers(
       }
       // '~' rather than a Windows homedir for WSL: the probe resolves it inside
       // the distribution, which is the only side that knows where home is.
+      const shareCwd = startFresh ? undefined : await recoveryCwdForShare(session);
       const cwd = startFresh
         ? (isWslShell(session.cmd) ? '~' : os.homedir())
-        : recoveryCwdLogged(session);
+        : shareCwd!.cwd;
 
       const PROMOTE_RETRIES = 4;
       let promoted: ReturnType<typeof sessionManager.createSession> | undefined;
@@ -3039,6 +3110,7 @@ function registerRpcHandlers(
 
       const promotedSession = sessionManager.getSession(sessionId);
       if (promotedSession) {
+        if (shareCwd?.cwdFallbackFrom) promotedSession.meta.cwdFallbackFrom = shareCwd.cwdFallbackFrom;
         // Lineage is where the pane came from, not a resume offer: kept either way.
         if (session.handoffFrom && !promotedSession.meta.handoffFrom) promotedSession.meta.handoffFrom = session.handoffFrom;
         if (session.paneAccount && !promotedSession.meta.paneAccount) promotedSession.meta.paneAccount = session.paneAccount;

@@ -680,6 +680,12 @@ export const ko = {
   // X6 ② — 복원된 대화형 에이전트 pane의 원클릭 resume pill.
   'resume.label': '{agent} 이어가기',
   'resume.tooltip': '이 pane의 이전 에이전트 대화를 이어갑니다',
+  'cwdRecovery.label': '이전 경로',
+  'cwdRecovery.tooltip': '이 pane이 네트워크 경로에서 시작하지 못했습니다 — 다시 이동',
+  'cwdRecovery.explain': '네트워크 공유에 연결할 수 없어 다른 위치에서 시작했습니다. 이전 경로:',
+  'cwdRecovery.cd': '이동 (cd)',
+  'cwdRecovery.cdTooltip': '이 pane에 cd 명령을 입력하고 실행합니다',
+  'cwdRecovery.dismiss': '닫기',
   'resume.dismiss': '닫기',
   // X6 ③ — 점진 조립: 첫 클릭은 권한 모드를 복원(명령만 입력, Enter 없음),
   // 이 두 번째 클릭은 정확한 세션 복원을 덧붙입니다. 실행은 사용자가 Enter.
@@ -1564,6 +1570,8 @@ export const ko = {
   'settings.startupDirectory': '시작 디렉토리',
   'settings.startupDirectoryDesc': '새 터미널이 시작되는 위치. 비우면 홈 디렉토리. 워크스페이스 프로필로 개별 재정의 가능.',
   'settings.startupDirectoryPlaceholder': '예: C:\\Projects',
+  'settings.trustedCwdRoots': '신뢰하는 네트워크 디렉터리',
+  'settings.trustedCwdRootsDesc': '터미널이 시작할 수 있는 네트워크 공유 루트(\\\\server\\share), ";"로 구분. 그 외 경로는 거부되며 pane에 원클릭 cd 버튼이 표시됩니다.',
   'settings.splitInheritsCwd': '분할 시 디렉토리 계승',
   'settings.splitInheritsCwdDesc': '창 분할로 생긴 새 패널이 원래 패널의 현재 디렉토리에서 시작합니다.',
   'settings.closeTabOnShellExit': '셸이 정상 종료되면 탭 닫기',

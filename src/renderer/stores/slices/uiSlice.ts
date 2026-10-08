@@ -530,6 +530,10 @@ export interface UISlice {
   startupDirectory: string;
   setStartupDirectory: (dir: string) => void;
 
+  // UNC roots trusted as terminal working directories ([] = none, upstream default).
+  trustedCwdRoots: string[];
+  setTrustedCwdRoots: (roots: string[]) => void;
+
   scrollbackLines: number;
   setScrollbackLines: (lines: number) => void;
 
@@ -1623,6 +1627,12 @@ export const createUISlice: StateCreator<StoreState, [['zustand/immer', never]],
 
   setStartupDirectory: (dir) => set((state) => {
     state.startupDirectory = dir.trim();
+  }),
+
+  trustedCwdRoots: [],
+
+  setTrustedCwdRoots: (roots) => set((state) => {
+    state.trustedCwdRoots = roots.map((r) => r.trim()).filter(Boolean);
   }),
 
   scrollbackLines: 10000,

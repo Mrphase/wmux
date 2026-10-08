@@ -56,6 +56,7 @@ import { toastManager } from '../pipe/handlers/notify.rpc';
 import { markRendererNotificationListenerReady } from '../notification/rendererNotificationReadiness';
 import { setMutedNotificationCategories } from '../notification/mutedCategories';
 import { setDefaultWslDistro } from '../pty/defaultWslDistro';
+import { setTrustedCwdRoots } from '../pty/trustedCwdRoots';
 import { updateUnreadBadge } from '../tray';
 import { eventBus } from '../events/EventBus';
 import { WMUX_EVENT_TYPES, type WmuxEventType } from '../../shared/events';
@@ -263,6 +264,14 @@ export function registerAllHandlers(
   };
   ipcMain.removeAllListeners(IPC.SETTINGS_DEFAULT_WSL_DISTRO);
   ipcMain.on(IPC.SETTINGS_DEFAULT_WSL_DISTRO, onDefaultWslDistro);
+
+  // Trusted UNC roots for terminal working directories; validatePtyCwd
+  // consults the mirror. Anything that is not a string[] clears it.
+  const onTrustedCwdRoots = (_event: Electron.IpcMainEvent, roots: unknown): void => {
+    setTrustedCwdRoots(roots);
+  };
+  ipcMain.removeAllListeners(IPC.SETTINGS_TRUSTED_CWD_ROOTS);
+  ipcMain.on(IPC.SETTINGS_TRUSTED_CWD_ROOTS, onTrustedCwdRoots);
 
   // #516 — mirror the renderer's per-category mute so the no-renderer toast
   // fallback in dispatchNotification can honor it.
@@ -558,6 +567,7 @@ export function registerAllHandlers(
     ipcMain.removeAllListeners(IPC.TOAST_ENABLED);
     ipcMain.removeAllListeners(IPC.MUTED_NOTIFICATION_CATEGORIES);
     ipcMain.removeAllListeners(IPC.SETTINGS_DEFAULT_WSL_DISTRO);
+    ipcMain.removeAllListeners(IPC.SETTINGS_TRUSTED_CWD_ROOTS);
     ipcMain.removeAllListeners(IPC.WINDOW_HIDE);
     ipcMain.removeAllListeners(IPC.WINDOW_FLASH_FRAME);
     ipcMain.removeAllListeners(IPC.NOTIFICATION_OS_TOAST);

@@ -934,6 +934,13 @@ export interface SessionData {
    */
   startupDirectory?: string;
   /**
+   * Network-share roots (`\\server\share[\dir]`) trusted as terminal working
+   * directories. UNC cwds are refused by default; one at or under a listed
+   * root is used like a local directory (with a short wait for a share that
+   * is not up yet after boot). Mirrored to main on load and change.
+   */
+  trustedCwdRoots?: string[];
+  /**
    * User setting: whether to attempt scrollback restore on launch.
    * true (default) — daemon-side ringBuffer replay + reconnect on Terminal mount.
    * false — startup clearAllPtyState; every pane mounts fresh. Daemon still

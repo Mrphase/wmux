@@ -106,6 +106,27 @@ export interface ResumeSlice {
 
   /** Replace the agent-liveness map from a `pty.list` snapshot. */
   hydrateAgentAlive: (snapshot: Record<string, boolean>) => void;
+
+  /**
+   * Network-share fallback per ptyId: the directory the pane was MEANT to
+   * start in (an untrusted or not-yet-reachable UNC share) when it had to
+   * start somewhere else. Drives the one-click `cd` back chip
+   * (CwdRecoveryChip). In-memory only; the daemon owns the durable copy and
+   * drops it once the pane's cwd moves on.
+   */
+  cwdFallbackByPtyId: Record<string, string>;
+
+  /** ptyIds whose cwd chip the user dismissed or used — a poll never resurrects it. */
+  cwdFallbackDismissedByPtyId: Record<string, true>;
+
+  /** Record one pane's fallback (pty.create result). */
+  setCwdFallback: (ptyId: string, from: string) => void;
+
+  /** Replace the fallback map from a `pty.list` snapshot (dismissed ptyIds stay hidden). */
+  hydrateCwdFallback: (snapshot: Record<string, string>) => void;
+
+  /** Hide the chip for good on this ptyId (dismiss, or the `cd` was typed). */
+  dismissCwdFallback: (ptyId: string) => void;
 }
 
 export const createResumeSlice: StateCreator<
@@ -119,6 +140,8 @@ export const createResumeSlice: StateCreator<
   resumeBindingByPtyId: {},
   commandRunningByPtyId: {},
   agentAliveByPtyId: {},
+  cwdFallbackByPtyId: {},
+  cwdFallbackDismissedByPtyId: {},
   ptyReadyByPtyId: {},
   pendingDeadPaneRecoveryBySurfaceId: {},
   deadPaneRecoveryOfferByPtyId: {},
@@ -213,6 +236,24 @@ export const createResumeSlice: StateCreator<
       if (snapshot[ptyId] === false) delete draft.surfaceTurnOpenAt[ptyId];
     }
     draft.commandRunningByPtyId = { ...snapshot };
+  }),
+
+  setCwdFallback: (ptyId, from) => set((draft: StoreState) => {
+    if (!ptyId || !from || draft.cwdFallbackDismissedByPtyId[ptyId]) return;
+    draft.cwdFallbackByPtyId[ptyId] = from;
+  }),
+
+  hydrateCwdFallback: (snapshot) => set((draft: StoreState) => {
+    const next: Record<string, string> = {};
+    for (const [ptyId, from] of Object.entries(snapshot)) {
+      if (!draft.cwdFallbackDismissedByPtyId[ptyId]) next[ptyId] = from;
+    }
+    draft.cwdFallbackByPtyId = next;
+  }),
+
+  dismissCwdFallback: (ptyId) => set((draft: StoreState) => {
+    delete draft.cwdFallbackByPtyId[ptyId];
+    draft.cwdFallbackDismissedByPtyId[ptyId] = true;
   }),
 
   hydrateAgentAlive: (snapshot) => set((draft: StoreState) => {

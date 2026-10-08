@@ -827,6 +827,15 @@ export class DaemonSessionManager extends EventEmitter {
       // payload originates in terminal output, which any process in the pane
       // can write, so it may not move a directory anything acts on.
       meta.cwd = payload.cwd;
+      // The pane moved on from its fallback directory (back to the network
+      // share, or anywhere else the user chose) — the fallback offer is spent.
+      // Compared loosely against the directory actually spawned in (`cwd`
+      // above, not spawnCwd — recovery replays the intended share there): the
+      // first prompt re-reports it, maybe with other casing or a trailing slash.
+      if (meta.cwdFallbackFrom) {
+        const norm = (p: string | undefined) => (p ?? '').replace(/[\\/]+$/, '').toLowerCase();
+        if (norm(payload.cwd) !== norm(cwd)) delete meta.cwdFallbackFrom;
+      }
       // Forward across the daemon→main boundary so the renderer can live-update
       // the per-surface cwd (tab tooltip + "Working directories" menu). Without
       // this, daemon mode (the default path) only kept cwd in daemon-local

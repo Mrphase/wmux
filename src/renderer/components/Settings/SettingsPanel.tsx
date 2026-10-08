@@ -1916,6 +1916,13 @@ function TabTerminal() {
   const setInlineImagesEnabled = useStore((s) => s.setInlineImagesEnabled);
   const startupDirectory = useStore((s) => s.startupDirectory);
   const setStartupDirectory = useStore((s) => s.setStartupDirectory);
+  // Trusted UNC cwd roots, edited as one `;`-separated line and mirrored to main.
+  const trustedCwdRoots = useStore((s) => s.trustedCwdRoots);
+  const onTrustedCwdRootsCommit = useCallback((value: string) => {
+    const roots = value.split(';').map((r) => r.trim()).filter(Boolean);
+    useStore.getState().setTrustedCwdRoots(roots);
+    window.electronAPI.settings.setTrustedCwdRoots(roots);
+  }, []);
   const [detectedShells, setDetectedShells] = useState<ShellInfo[]>([]);
   const shellOptions = detectedShells.map((shell) => ({ value: shell.path, label: shell.name }));
 
@@ -2001,6 +2008,14 @@ function TabTerminal() {
             value={startupDirectory}
             onCommit={setStartupDirectory}
             placeholder={t('settings.startupDirectoryPlaceholder')}
+          />
+        </SettingRow>
+        <SettingRow id="trustedcwdroots" label={t('settings.trustedCwdRoots')} description={t('settings.trustedCwdRootsDesc')}>
+          <SettingPathInput
+            label={t('settings.trustedCwdRoots')}
+            value={trustedCwdRoots.join('; ')}
+            onCommit={onTrustedCwdRootsCommit}
+            placeholder={'\\\\server\\share'}
           />
         </SettingRow>
         <SettingRow id="splitcwd" label={t('settings.splitInheritsCwd')} description={t('settings.splitInheritsCwdDesc')}>

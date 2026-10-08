@@ -49,7 +49,7 @@ import type { ResumeBinding } from '../../../shared/agentResume';
 import type { AgentSlug } from '../../../shared/events';
 import { createDeadPaneRecovery, type DeadPaneRecovery } from '../../../shared/ptyRecovery';
 import { isWslShell, type WslTarget } from '../../../shared/wsl';
-import { resolvePtyCreateCwdForShell, type PtyCwdSource } from '../../pty/resolvePtyCwd';
+import { cwdFallbackFrom, resolvePtyCreateCwdForShell, waitForTrustedUncCwds, type PtyCwdSource } from '../../pty/resolvePtyCwd';
 import { FANOUT_TASK_PORT_ENV } from '../../worktask/fanoutEnvironment';
 import { agentDisplayToSlug } from '../../../shared/agentIdentity';
 import { wslDistroArgs, isWslDistroSpawnArgs } from '../../../shared/wslDistro';
@@ -423,7 +423,11 @@ export function registerPTYHandlers(
       // ShellDetector (issue #176) — mirrors PTYManager.getDefaultShell() so
       // both modes pick the same default.
       const shell = options?.shell || (process.platform === 'win32' ? new ShellDetector().getDefault() : (process.env.SHELL || '/bin/bash'));
+      if (!isWslShell(shell)) {
+        await waitForTrustedUncCwds([options?.cwd, options?.recoveryCwds?.spawnCwd, options?.recoveryCwds?.cwd]);
+      }
       const cwdResolution = resolvePtyCreateCwdForShell(options?.cwd, options?.recoveryCwds, shell);
+      const fallbackFrom = cwdFallbackFrom(cwdResolution, options?.recoveryCwds, shell);
       const safeCwd = cwdResolution.safeCwd;
       let effectiveCwd = safeCwd ?? (isWslShell(shell) ? '~' : homedir());
       // #1103 — the renderer's WSL distro choice, applied at the one place
@@ -558,6 +562,7 @@ export function registerPTYHandlers(
         cmd: shell,
         ...(wslArgs ? { args: wslArgs } : {}),
         cwd: effectiveCwd,
+        ...(fallbackFrom ? { cwdFallbackFrom: fallbackFrom } : {}),
         wslTarget: trustedRecovery?.wslTarget,
         cols: options?.cols || 80,
         rows: options?.rows || 24,
@@ -630,7 +635,7 @@ export function registerPTYHandlers(
         writePidMap(shellPid, sessionId);
       }
 
-      return { id: sessionId, shell, cwd: effectiveCwd };
+      return { id: sessionId, shell, cwd: effectiveCwd, ...(fallbackFrom ? { cwdFallbackFrom: fallbackFrom } : {}) };
     }));
   } else {
     ipcMain.handle(IPC.PTY_CREATE, wrapHandler(IPC.PTY_CREATE, async (_event: Electron.IpcMainInvokeEvent, options?: PtyCreateOptions) => {
@@ -670,7 +675,11 @@ export function registerPTYHandlers(
       // spawn even when the caller omitted one.
       const shell = options?.shell
         || (process.platform === 'win32' ? new ShellDetector().getDefault() : (process.env.SHELL || '/bin/bash'));
+      if (!isWslShell(shell)) {
+        await waitForTrustedUncCwds([options?.cwd, options?.recoveryCwds?.spawnCwd, options?.recoveryCwds?.cwd]);
+      }
       const cwdResolution = resolvePtyCreateCwdForShell(options?.cwd, options?.recoveryCwds, shell);
+      const fallbackFrom = cwdFallbackFrom(cwdResolution, options?.recoveryCwds, shell);
       const safeCwd = cwdResolution.safeCwd;
       const effectiveCwd = safeCwd ?? undefined;
       // Split off initialCommand — it's written into the shell post-create, not
@@ -698,7 +707,7 @@ export function registerPTYHandlers(
           initialCmd.onFirstData();
         });
       }
-      return { id: instance.id, shell: instance.shell, cwd: actualCwd };
+      return { id: instance.id, shell: instance.shell, cwd: actualCwd, ...(fallbackFrom ? { cwdFallbackFrom: fallbackFrom } : {}) };
     }));
   }
 
@@ -1045,6 +1054,8 @@ export function registerPTYHandlers(
         // The slug of the pane's live, process-attributed agent. Absent when
         // none is attributed or it died.
         liveAgent?: AgentSlug;
+        // Network-share fallback: the directory this pane was meant to start in.
+        cwdFallbackFrom?: string;
       }>;
       // Map to same shape as local PTYManager.getActiveInstances(), plus an
       // additive `supervision` summary for the renderer's supervision slice
@@ -1106,6 +1117,8 @@ export function registerPTYHandlers(
           // Process-truth identity — seeds the pane's agent row when no hook
           // or banner named it.
           ...(s.liveAgent ? { liveAgent: s.liveAgent } : {}),
+          // Network-share fallback — drives the one-click `cd` back chip.
+          ...(s.cwdFallbackFrom && s.state !== 'dead' ? { cwdFallbackFrom: s.cwdFallbackFrom } : {}),
           // #1101 — origin identity for the orphaned-session list. workspaceId
           // is the spawn-time env stamp (present for every pane-origin session;
           // absent for phone-created ones, which then adopt into the active

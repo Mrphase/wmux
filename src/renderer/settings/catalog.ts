@@ -97,6 +97,7 @@ export const SETTINGS_CATALOG: SettingsCatalogEntry[] = [
 
   { id: 'shell', tab: 'terminal', labelKey: 'settings.defaultShell', synonyms: 'zsh bash powershell pwsh fish 셸' },
   { id: 'startdir', tab: 'terminal', labelKey: 'settings.startupDirectory', descKey: 'settings.startupDirectoryDesc', synonyms: 'cwd home folder path' },
+  { id: 'trustedcwdroots', tab: 'terminal', labelKey: 'settings.trustedCwdRoots', descKey: 'settings.trustedCwdRootsDesc', synonyms: 'unc network share smb remote cwd path' },
   { id: 'splitcwd', tab: 'terminal', labelKey: 'settings.splitInheritsCwd', descKey: 'settings.splitInheritsCwdDesc', synonyms: 'cwd split inherit' },
   { id: 'closeonexit', tab: 'terminal', labelKey: 'settings.closeTabOnShellExit', descKey: 'settings.closeTabOnShellExitDesc', synonyms: 'exit close tab shell ctrl+d' },
   { id: 'ime', tab: 'terminal', labelKey: 'settings.imeResidueGuard', descKey: 'settings.imeResidueGuardDesc', synonyms: 'ime korean cjk hangul 한글 입력' },

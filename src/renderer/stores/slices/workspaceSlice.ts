@@ -1236,6 +1236,13 @@ export const createWorkspaceSlice: StateCreator<StoreState, [['zustand/immer', n
       if (typeof window !== 'undefined') {
         window.electronAPI?.settings?.setDefaultWslDistro?.(state.defaultWslDistro ?? null);
       }
+      // Trusted UNC cwd roots — same main-side mirror pattern as the distro.
+      state.trustedCwdRoots = Array.isArray(data.trustedCwdRoots)
+        ? data.trustedCwdRoots.filter((r): r is string => typeof r === 'string' && r.trim() !== '').map((r) => r.trim())
+        : [];
+      if (typeof window !== 'undefined') {
+        window.electronAPI?.settings?.setTrustedCwdRoots?.([...state.trustedCwdRoots]);
+      }
       if (typeof data.deckBrainModel === 'string') state.deckBrainModel = data.deckBrainModel;
       state.deckBrainEffort = sanitizeClaudeEffort(data.deckBrainEffort);
       // D2 — re-normalize on load (session.json is hand-editable / untrusted).

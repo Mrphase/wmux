@@ -265,7 +265,7 @@ const electronAPI = {
       // rebind a stale ptyId to the surviving session after a reboot.
       // `workspaceId`/`agentName` (#1101): origin identity for the orphaned
       // session list.
-      ipcRenderer.invoke(IPC.PTY_LIST, opts) as Promise<{ id: string; shell: string; surfaceId?: string; createdAt?: string; state?: string; cwd?: string; spawnCwd?: string; workspaceId?: string; agentName?: string; supervision?: { status: 'armed' | 'stopped'; restartCount: number }; resumeAgent?: AgentSlug; resumeBinding?: ResumeBinding; commandRunning?: boolean; agentProcessAlive?: boolean; liveAgent?: AgentSlug }[]>,
+      ipcRenderer.invoke(IPC.PTY_LIST, opts) as Promise<{ id: string; shell: string; surfaceId?: string; createdAt?: string; state?: string; cwd?: string; spawnCwd?: string; workspaceId?: string; agentName?: string; supervision?: { status: 'armed' | 'stopped'; restartCount: number }; resumeAgent?: AgentSlug; resumeBinding?: ResumeBinding; commandRunning?: boolean; agentProcessAlive?: boolean; liveAgent?: AgentSlug; cwdFallbackFrom?: string }[]>,
     // TASK-6 — per-pane agent RAM for the Fleet View cockpit. Given the ptyIds
     // currently shown as cards, returns { [ptyId]: { rss (bytes), image? } } by
     // walking each pane shell's descendant process tree from ONE CIM snapshot.
@@ -431,6 +431,8 @@ const electronAPI = {
     setAutoUpdateEnabled: (enabled: boolean) => ipcRenderer.send(IPC.AUTO_UPDATE_ENABLED, enabled),
     // #1103 — null clears the choice (back to wsl.exe's system default).
     setDefaultWslDistro: (distro: string | null) => ipcRenderer.send(IPC.SETTINGS_DEFAULT_WSL_DISTRO, distro),
+    // UNC roots (\\server\share) the user trusts as terminal working directories.
+    setTrustedCwdRoots: (roots: string[]) => ipcRenderer.send(IPC.SETTINGS_TRUSTED_CWD_ROOTS, roots),
   },
   // Windows "start on login" toggle (issue #460). Backed by the per-user Run
   // registry key. `get`/`set` resolve to the live state; off-Windows both

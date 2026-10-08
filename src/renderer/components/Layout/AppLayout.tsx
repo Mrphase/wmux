@@ -439,6 +439,7 @@ function buildSessionData(dumped: Map<string, boolean>): SessionData {
     siteGuidesEnabled: state.siteGuidesEnabled,
     siteGuidesAutoEnabled: state.siteGuidesAutoEnabled,
     startupDirectory: state.startupDirectory || undefined,
+    trustedCwdRoots: state.trustedCwdRoots.length > 0 ? state.trustedCwdRoots : undefined,
     scrollbackLines: state.scrollbackLines,
     scrollbackRestoreEnabled: state.scrollbackRestoreEnabled,
     a2aAutoApproveExecute: state.a2aAutoApproveExecute,
@@ -1836,18 +1837,22 @@ export default function AppLayout() {
         const commandRunningSnapshot: Record<string, boolean> = {};
         // Process-truth agent liveness — the chip's edge-trigger gate.
         const agentAliveSnapshot: Record<string, boolean> = {};
+        // Network-share fallbacks — the one-click `cd` back chip.
+        const cwdFallbackSnapshot: Record<string, string> = {};
         for (const s of sessions) {
           if (s.supervision) snapshot[s.id] = s.supervision;
           if (s.resumeAgent) resumeSnapshot[s.id] = s.resumeAgent as AgentSlug;
           if (s.resumeBinding) resumeBindingSnapshot[s.id] = s.resumeBinding;
           if (s.commandRunning !== undefined) commandRunningSnapshot[s.id] = s.commandRunning;
           if (s.agentProcessAlive !== undefined) agentAliveSnapshot[s.id] = s.agentProcessAlive;
+          if (s.cwdFallbackFrom) cwdFallbackSnapshot[s.id] = s.cwdFallbackFrom;
         }
         useStore.getState().hydrateSupervision(snapshot);
         useStore.getState().hydrateResume(resumeSnapshot);
         useStore.getState().hydrateResumeBindings(resumeBindingSnapshot);
         useStore.getState().hydrateCommandRunning(commandRunningSnapshot);
         useStore.getState().hydrateAgentAlive(agentAliveSnapshot);
+        useStore.getState().hydrateCwdFallback(cwdFallbackSnapshot);
         // #1210: the slug is stamped on detect and was never cleared on
         // agent exit. Process-truth `false` and OSC 133 "back at a prompt"
         // are the two signals that the TUI is gone — drop the identity so
@@ -1923,14 +1928,19 @@ export default function AppLayout() {
         // Agent process liveness rides along too — it is the edge (alive→dead)
         // that lets the chip appear on panes without shell integration.
         const agentAliveSnapshot: Record<string, boolean> = {};
+        // Network-share fallbacks ride along too (one-click `cd` back chip);
+        // the daemon drops one as soon as the pane's cwd moves on.
+        const cwdFallbackSnapshot: Record<string, string> = {};
         for (const s of sessions) {
           if (s.resumeBinding) snapshot[s.id] = s.resumeBinding;
           if (s.commandRunning !== undefined) cmdSnapshot[s.id] = s.commandRunning;
           if (s.agentProcessAlive !== undefined) agentAliveSnapshot[s.id] = s.agentProcessAlive;
+          if (s.cwdFallbackFrom) cwdFallbackSnapshot[s.id] = s.cwdFallbackFrom;
         }
         useStore.getState().hydrateResumeBindings(snapshot);
         useStore.getState().hydrateCommandRunning(cmdSnapshot);
         useStore.getState().hydrateAgentAlive(agentAliveSnapshot);
+        useStore.getState().hydrateCwdFallback(cwdFallbackSnapshot);
         clearSurfaceAgentsKnownGone(agentAliveSnapshot, cmdSnapshot, requestedAt);
         // An agent relaunched after boot (the Resume pill) is attributed by
         // the daemon seconds later; this tick is what brings its row back.
