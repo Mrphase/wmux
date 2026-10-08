@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useT } from '../../hooks/useT';
 import { useStore } from '../../stores';
-import { isWslShell } from '../../../shared/wsl';
+import { isWslShell } from '../../../shared/imagePaste';
 
 /**
  * The command that moves `shell` into `dir`. Returns `null` when the shell
