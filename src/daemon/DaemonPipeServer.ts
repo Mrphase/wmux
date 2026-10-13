@@ -99,6 +99,8 @@ export class DaemonPipeServer {
   // by default — see `broadcast`. Dies with the socket, so a reconnecting
   // client must re-subscribe.
   private readonly eventSubscribers = new Set<net.Socket>();
+  // Subscribers paused by broadcast backpressure; re-added on 'drain'.
+  private readonly stalledSubscribers = new Set<net.Socket>();
   // Fresh sockets get one bounded chance to identify as the first-party app
   // and subscribe without losing events generated during that handshake. An
   // unrelated first authenticated RPC discards this queue and preserves the
@@ -344,6 +346,7 @@ export class DaemonPipeServer {
         socket.on('close', () => {
           this.connectedSockets.delete(socket);
           this.eventSubscribers.delete(socket);
+          this.stalledSubscribers.delete(socket);
           this.preSubscribeBacklogs.delete(socket);
           this.rateLimits.delete(socket);
           this.clientIds.delete(socket);
@@ -528,6 +531,17 @@ export class DaemonPipeServer {
             `[DaemonPipeServer] dropping stalled event subscriber ${clientId}: `
             + `${socket.writableLength} buffered bytes exceeds ${SUBSCRIBER_BACKPRESSURE_BYTES}`,
           );
+          // A stall is usually a busy app (boot-time scrollback replay), not a
+          // dead one, and the socket stays open: without this the client keeps
+          // a live connection that never carries another event. Resume once the
+          // backlog has drained; the events dropped in between stay lost.
+          this.stalledSubscribers.add(socket);
+          socket.once('drain', () => {
+            // An explicit unsubscribe (or close) meanwhile cancels the resume.
+            if (!this.stalledSubscribers.delete(socket) || socket.destroyed) return;
+            this.eventSubscribers.add(socket);
+            console.warn(`[DaemonPipeServer] resumed event subscriber ${clientId} after drain`);
+          });
           return;
         }
         try {
@@ -791,6 +805,7 @@ export class DaemonPipeServer {
     const socket = this.socketsByClientId.get(clientId);
     if (socket) {
       this.eventSubscribers.delete(socket);
+      this.stalledSubscribers.delete(socket);
       this.preSubscribeBacklogs.delete(socket);
     }
   }

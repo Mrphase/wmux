@@ -22,6 +22,14 @@ Local fork of `openwong2kim/wmux`, rebased onto upstream `main`.
    - `CwdRecoveryChip` (top-left of a pane, same style as the Resume chip): shows the last
      path, ⧉ copy, ↪ cd there (PowerShell `Set-Location -LiteralPath`, cmd `pushd`, bash `cd`;
      typed WITH Enter). The Resume chip waits until the pane is back in its directory.
+3. `fix(daemon)`: a broadcast subscriber dropped for backpressure (> 4 MiB buffered, e.g. the
+   app replaying 40 panes at boot) is resumed on the socket's `drain`. Upstream (4.3.1 too)
+   dropped it for good while the socket stayed open, so main got no daemon events until a
+   restart — typed input / lifecycle never reached the settle service and a working
+   workspace stayed in 已收尾. Log: `dropping stalled event subscriber` then `resumed event
+   subscriber ... after drain` in `~/.wmux/logs/daemon-*.log`.
+   - Also run `wmux setup-hooks` so Claude hooks include `UserPromptSubmit`/`StopFailure`
+     (the fleet "running" dot relies on them).
 
 ## Dropped from 636f4dc (upstream fixed it)
 

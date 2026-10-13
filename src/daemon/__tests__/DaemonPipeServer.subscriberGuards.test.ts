@@ -3,7 +3,8 @@
 //   D6 — `sendTo` refuses and `broadcast` drops the event subscription once a
 //        client stops draining. Node's writable buffer has no ceiling, so
 //        "queue it anyway" is unbounded heap growth in the always-on process,
-//        one full event at a time.
+//        one full event at a time. A broadcast subscriber dropped this way is
+//        resumed once its socket drains.
 //   D7 — first-party CLASSIFICATION. The transcript RPCs return a pane's whole
 //        conversation, and the daemon previously handed that to any token-holding
 //        pipe client (CLI, MCP) despite the design note that says otherwise.
@@ -138,18 +139,72 @@ describe('DaemonPipeServer — subscriber backpressure (D6)', () => {
     expect(server.subscribeEvents(draining.clientId)).toBe(true);
 
     server.broadcast({ type: 'title.changed', n: 'first' });
+    // Checked synchronously: once the paused socket's backlog drains the
+    // subscription is resumed (see the next test).
+    expect(server.isEventSubscriber(stalled.clientId)).toBe(false);
     await waitFor(() => received.includes('"n":"first"'));
 
-    expect(server.isEventSubscriber(stalled.clientId)).toBe(false);
     expect(server.isEventSubscriber(draining.clientId)).toBe(true);
     expect(stalled.socket.destroyed).toBe(false);
     expect(server.getConnectionCount()).toBe(2);
-    expect(warn).toHaveBeenCalledTimes(1);
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('dropping stalled event subscriber'));
 
     server.broadcast({ type: 'title.changed', n: 'after-drop' });
     await waitFor(() => received.includes('"n":"after-drop"'));
     expect(server.isEventSubscriber(draining.clientId)).toBe(true);
+  });
+
+  /** Push a paused socket past the cap, subscribe it, and broadcast once. */
+  async function stallSubscriber(server: DaemonPipeServer, pipe: string, token: string) {
+    const client = await connectClient(server, pipe, token);
+    client.socket.pause();
+    const payload = { type: 'transcript.appended', blob: 'z'.repeat(SUBSCRIBER_BACKPRESSURE_BYTES) };
+    expect(server.sendTo(client.clientId, payload)).toBe(true);
+    let refused = false;
+    for (let i = 0; i < 5 && !refused; i++) {
+      refused = server.sendTo(client.clientId, payload) === false;
+    }
+    expect(refused).toBe(true);
+    server.markFirstParty(client.clientId);
+    expect(server.subscribeEvents(client.clientId)).toBe(true);
+    server.broadcast({ type: 'title.changed', n: 'while-stalled' });
+    expect(server.isEventSubscriber(client.clientId)).toBe(false);
+    return client;
+  }
+
+  it('resumes a stalled broadcast subscriber once its backlog drains', async () => {
+    // The app stalls at boot (scrollback replay of every pane) but keeps the
+    // socket; losing the subscription for good left it deaf to every later event.
+    const { server, pipe, token } = await startServer('broadcast-resume');
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const stalled = await stallSubscriber(server, pipe, token);
+
+    let received = '';
+    stalled.socket.setEncoding('utf8');
+    stalled.socket.on('data', (chunk: string) => { received += chunk; });
+    stalled.socket.resume();
+    await waitFor(() => server.isEventSubscriber(stalled.clientId), 10_000);
+
+    server.broadcast({ type: 'title.changed', n: 'after-drain' });
+    await waitFor(() => received.includes('"n":"after-drain"'), 10_000);
+    expect(received.includes('"n":"while-stalled"')).toBe(false);
+  });
+
+  it('does not resume a stalled subscriber that unsubscribed meanwhile', async () => {
+    const { server, pipe, token } = await startServer('broadcast-resume-unsub');
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const stalled = await stallSubscriber(server, pipe, token);
+    server.unsubscribeEvents(stalled.clientId);
+
+    let drained = false;
+    stalled.socket.on('data', () => undefined);
+    stalled.socket.resume();
+    server.onRpc('test.ping', async () => { drained = true; return {}; });
+    stalled.socket.write(JSON.stringify({ id: 'p', method: 'test.ping', token }) + '\n');
+    await waitFor(() => drained, 10_000);
+    // Give the server a turn to flush the backlog and fire 'drain'.
+    await new Promise((r) => setTimeout(r, 200));
+    expect(server.isEventSubscriber(stalled.clientId)).toBe(false);
   });
 
   it('closes a stalled socket instead of accepting a lossy subscription retry', async () => {
