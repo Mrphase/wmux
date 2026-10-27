@@ -6,6 +6,7 @@ Local fork of `openwong2kim/wmux`, rebased onto upstream `main`.
 
 - `origin` = https://github.com/openwong2kim/wmux (upstream)
 - `fork`   = https://github.com/Mrphase/wmux (old 3.40.2 patch: `fix/terminal-resize-snapshot` @ 636f4dc)
+- `qc`     = https://github.qualcomm.com/zehuxie/wmux (private, company GHE; no proxy needed)
 - Sync: `git fetch origin && git rebase origin/main`. Keep local commits small and independent.
 
 ## Local commits on top of upstream
