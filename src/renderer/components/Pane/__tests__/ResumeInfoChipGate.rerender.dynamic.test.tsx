@@ -14,9 +14,9 @@
 //   (a) a component that reads the per-pane fields the Pane BODY keeps after the
 //       fix (NOT agentClockMs) does not re-render on a clock tick — the "Pane
 //       body did zero work" guarantee, and
-//   (b) the gate leaf itself DOES re-render on a tick (idle → renders the chip;
-//       busy → returns null) — the cost is confined to the small leaf, and the
-//       busy semantics (isPaneAgentBusy) are preserved.
+//   (b) the gate leaf itself DOES re-render on a tick (the chip is rendered
+//       either way; busy → its 복구 action is disabled) — the cost is confined
+//       to the small leaf, and the busy semantics (isPaneAgentBusy) are preserved.
 //
 // NOTE: the real <Pane> pulls in xterm/Terminal and cannot be mounted cheaply in
 // jsdom (the sibling Pane tests deliberately avoid it), so `PaneBodyProbe`
@@ -126,14 +126,28 @@ describe('agentClockMs isolation — a tick re-renders only the resume-chip leaf
     expect(commits['gate-idle']).toBeGreaterThanOrEqual(1);
   });
 
-  it('busy pane: the gate suppresses the chip but still absorbs the tick in the leaf', () => {
-    // Busy gate returned null (agent owns the PTY) — chip suppressed.
+  it('busy pane: the chip stays visible (both triggers) and the leaf still absorbs the tick', () => {
+    // The chip is resident: busy no longer hides it — both gates render both
+    // triggers (↩ Resume + Session).
+    expect(container.querySelectorAll('button[aria-expanded]').length).toBe(4);
     expect(commits['gate-busy']).toBeGreaterThanOrEqual(1); // mounted (subscribed)
     reset('gate-busy'); reset('body-idle');
     tick();
     // Still just the leaf re-rendering; no Pane body anywhere is dragged in.
     expect(commits['gate-busy']).toBeGreaterThanOrEqual(1);
     expect(commits['body-idle']).toBe(0);
+  });
+
+  it('busy pane: 복구 is disabled; idle pane: enabled (the gate passes agentBusy down)', () => {
+    const triggers = Array.from(container.querySelectorAll<HTMLButtonElement>('button[aria-expanded]'));
+    // Order: idle (Resume, Session), busy (Resume, Session). Open both Resume panels.
+    act(() => { triggers[0].click(); });
+    act(() => { triggers[2].click(); });
+    const recover = Array.from(container.querySelectorAll<HTMLButtonElement>('button'))
+      .filter((b) => !b.hasAttribute('aria-expanded') && (b.textContent ?? '').includes('Resume'));
+    expect(recover.length).toBe(2);
+    expect(recover[0].disabled).toBe(false);
+    expect(recover[1].disabled).toBe(true);
   });
 
   it('multiple ticks never touch the Pane body', () => {

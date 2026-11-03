@@ -188,14 +188,23 @@ export const createResumeSlice: StateCreator<
   }),
 
   clearResumeHint: (ptyId) => set((draft: StoreState) => {
-    // Clear the binding together with the hint — the pill goes away as a unit
-    // (clicked, dismissed, typed-into, or agent relaunched).
+    // The pill goes (clicked, dismissed, typed-into, or agent relaunched), but
+    // the daemon's live binding stays: the ResumeInfoChip is persistent, and
+    // the 15 s poll would only bring the binding back — every keystroke made
+    // the chip blink out. A dead pane's offered binding is consumed with it.
     if (draft.resumeHintByPtyId[ptyId]) {
       delete draft.resumeHintByPtyId[ptyId];
       draft.resumeConsumedByPtyId[ptyId] = true;
     }
-    if (draft.resumeBindingByPtyId[ptyId]) delete draft.resumeBindingByPtyId[ptyId];
-    if (draft.deadPaneRecoveryOfferByPtyId[ptyId]) delete draft.deadPaneRecoveryOfferByPtyId[ptyId];
+    const offer = draft.deadPaneRecoveryOfferByPtyId[ptyId];
+    if (offer) {
+      const offered = offer.resumeBinding;
+      const current = draft.resumeBindingByPtyId[ptyId];
+      if (offered && current && current.sessionId === offered.sessionId) {
+        delete draft.resumeBindingByPtyId[ptyId];
+      }
+      delete draft.deadPaneRecoveryOfferByPtyId[ptyId];
+    }
   }),
 
   hydrateResume: (snapshot) => set((draft: StoreState) => {

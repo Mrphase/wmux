@@ -83,14 +83,23 @@ describe('resumeSlice', () => {
       expect(useStore.getState().resumeBindingByPtyId['pty-b']?.sessionId).toBe('s-2');
     });
 
-    it('clearResumeHint clears the binding together with the hint (pill is one unit)', () => {
+    it('clearResumeHint drops the hint but keeps the live binding (persistent chip)', () => {
+      // Every real keystroke calls clearResumeHint; dropping the daemon's binding
+      // there made the always-on chip vanish until the next 15 s poll.
       useStore.getState().setResumeHint('pty-a', 'claude');
       useStore.getState().hydrateResumeBindings({ 'pty-a': binding('s-1'), 'pty-b': binding('s-2') });
       useStore.getState().clearResumeHint('pty-a');
       expect(useStore.getState().resumeHintByPtyId['pty-a']).toBeUndefined();
-      expect(useStore.getState().resumeBindingByPtyId['pty-a']).toBeUndefined();
-      // untouched sibling
+      expect(useStore.getState().resumeBindingByPtyId['pty-a']?.sessionId).toBe('s-1');
       expect(useStore.getState().resumeBindingByPtyId['pty-b']?.sessionId).toBe('s-2');
+    });
+
+    it('clearResumeHint consumes a dead pane\'s offered binding immediately', () => {
+      useStore.getState().stageDeadPaneRecovery('surface-a', { resumeBinding: binding('dead-conversation') });
+      useStore.getState().completeDeadPaneRecovery('surface-a', 'pty-new');
+      useStore.getState().clearResumeHint('pty-new');
+      expect(useStore.getState().resumeBindingByPtyId['pty-new']).toBeUndefined();
+      expect(useStore.getState().deadPaneRecoveryOfferByPtyId['pty-new']).toBeUndefined();
     });
   });
 

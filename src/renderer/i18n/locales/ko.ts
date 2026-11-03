@@ -691,6 +691,14 @@ export const ko = {
   // 이 두 번째 클릭은 정확한 세션 복원을 덧붙입니다. 실행은 사용자가 Enter.
   'resume.addSession': '이 세션 복원',
   'resume.addSessionTooltip': '이전 대화를 정확히 이어가기 (--resume <id>); 실행하려면 Enter',
+  'resume.tabResume': '이어가기',
+  'resume.tabSession': '세션',
+  'resume.sessionTooltip': '이 pane 에이전트의 세션 ID와 작업 경로 보기',
+  'resume.agentLabel': '에이전트',
+  'resume.sessionId': '세션 ID',
+  'resume.workingPath': '작업 경로',
+  'resume.currentPath': '현재 경로',
+  'resume.busyHint': '에이전트가 실행 중입니다 — 유휴 상태가 되면 이어가세요 (지금은 명령이 에이전트 입력란에 입력됩니다)',
 
   // Browser
   'browser.urlPlaceholder': 'URL 입력...',

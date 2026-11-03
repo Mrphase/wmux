@@ -973,6 +973,15 @@ export const en = {
   // resume. The user presses Enter to run.
   'resume.addSession': 'resume this session',
   'resume.addSessionTooltip': 'Also resume the exact previous conversation (--resume <id>); press Enter to run',
+  // Persistent resume chip — Resume / Session tabs + the busy gate on recover.
+  'resume.tabResume': 'Resume',
+  'resume.tabSession': 'Session',
+  'resume.sessionTooltip': 'Show the agent session ID and working path of this pane',
+  'resume.agentLabel': 'Agent',
+  'resume.sessionId': 'Session ID',
+  'resume.workingPath': 'Working path',
+  'resume.currentPath': 'Current path',
+  'resume.busyHint': 'Agent is running — resume once it is idle (otherwise the command is typed into the agent)',
 
   // Browser
   'browser.urlPlaceholder': 'Enter URL...',

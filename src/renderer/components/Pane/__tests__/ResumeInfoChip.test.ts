@@ -233,6 +233,7 @@ describe('ResumeInfoChip render smoke', () => {
       createElement(ResumeInfoChip, { ptyId: 'pty-1', binding, paneCwds: ['/Users/me/proj'] }),
     );
     expect(html).toContain('Resume'); // trigger label (t('resume.label'))
+    expect(html).toContain('Session'); // resident Session trigger (t('resume.tabSession'))
     // Collapsed by default → the UUID is NOT in the initial markup.
     expect(html).not.toContain(binding.sessionId);
   });
