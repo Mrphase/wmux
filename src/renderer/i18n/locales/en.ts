@@ -942,6 +942,8 @@ export const en = {
   'terminal.mouseOwnedSelectHintMac': 'This app is using the mouse — hold Option to select text',
   'terminal.openPathBlocked': 'Executable blocked — opened parent folder',
   'terminal.openPathFailed': "Couldn't open — showing folder",
+  'terminal.openPathMissingParent': 'Path not found — opened the nearest existing folder',
+  'terminal.openPathNotFound': 'Path not found or unreachable',
   'terminal.bookmarkAdded': 'Bookmark added',
   'terminal.scrollToBottom': 'Scroll to bottom',
   'terminal.imeInputRecovered': 'Keyboard input was stuck in the IME and has been recovered automatically',

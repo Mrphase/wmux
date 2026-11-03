@@ -374,6 +374,11 @@ function notifyOpenFailed(t: (key: TranslationKey, params?: Record<string, strin
     message = `${label}: ${t('workspace.openFailedQuoting')}`;
   } else if (detail?.startsWith('PATH_HAS_ENV_SYNTAX:')) {
     message = `${label}: ${t('workspace.openFailedEnvSyntax', { name: detail.slice('PATH_HAS_ENV_SYNTAX:'.length) })}`;
+  } else if (detail === 'NOT_FOUND_OPENED_PARENT') {
+    // Main already opened the nearest existing ancestor — say so, not "failed: <code>".
+    message = t('terminal.openPathMissingParent');
+  } else if (detail === 'NOT_FOUND' || detail === 'LOOKUP_TIMEOUT') {
+    message = `${label}: ${t('terminal.openPathNotFound')}`;
   }
   useStore.getState().pushToast({ level: 'warn', message });
 }

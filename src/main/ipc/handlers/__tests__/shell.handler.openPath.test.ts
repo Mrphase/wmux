@@ -6,10 +6,25 @@
  *   • relative paths, NUL bytes, non-strings, length overflow are rejected
  *   • path.normalize is applied (so `..` collapses before isAbsolute check)
  *   • openPath returning an error string triggers showItemInFolder fallback
+ *     for an existing target, and opens the nearest existing ancestor folder
+ *     for a missing one (bounded by a lookup timeout)
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
+// Fake filesystem for the failed-open fallback: path → what stat reports.
+// 'hang' never settles, like a UNC path on an unreachable server.
+const fsEntries = vi.hoisted(() => new Map<string, 'dir' | 'file' | 'hang'>());
+
 // ── Module mocks (hoisted; cannot reference outer test variables) ──────────
+
+vi.mock('fs/promises', () => ({
+  stat: vi.fn((p: string) => {
+    const kind = fsEntries.get(p);
+    if (kind === 'hang') return new Promise(() => { /* never settles */ });
+    if (!kind) return Promise.reject(Object.assign(new Error('ENOENT'), { code: 'ENOENT' }));
+    return Promise.resolve({ isDirectory: () => kind === 'dir' });
+  }),
+}));
 
 vi.mock('electron', () => {
   const handlers = new Map<string, (...args: unknown[]) => unknown>();
@@ -63,6 +78,7 @@ let cleanup: (() => void) | null = null;
 
 beforeEach(() => {
   handlers.clear();
+  fsEntries.clear();
   openPath.mockReset();
   showItemInFolder.mockReset();
   // Default: openPath succeeds (empty error string).
@@ -135,13 +151,103 @@ describe('shell.handler — SHELL_OPEN_PATH', () => {
     expect(openPath).toHaveBeenCalledWith(expected);
   });
 
-  it('falls back to showItemInFolder when openPath returns an error', async () => {
+  it('falls back to showItemInFolder when an existing file fails to open', async () => {
     openPath.mockResolvedValueOnce('Failed to open path');
     const handler = getHandler(IPC.SHELL_OPEN_PATH);
-    const input = process.platform === 'win32' ? 'C:\\does-not-exist' : '/does-not-exist';
+    const input = process.platform === 'win32' ? 'C:\\no-handler.xyz' : '/no-handler.xyz';
+    fsEntries.set(input, 'file');
     const result = await handler(fakeEvent, input);
     expect(showItemInFolder).toHaveBeenCalledWith(input);
+    expect(openPath).toHaveBeenCalledTimes(1);
     expect(result).toEqual({ ok: false, error: 'Failed to open path' });
+  });
+
+  describe('missing target fallback', () => {
+    const isWin = process.platform === 'win32';
+    // Absolute path on the host OS from plain segments.
+    const abs = (...segs: string[]) => (isWin ? 'C:\\' : '/') + segs.join(isWin ? '\\' : '/');
+    const root = isWin ? 'C:\\' : '/';
+
+    beforeEach(() => {
+      // First call is the target itself; it fails because it does not exist.
+      openPath.mockResolvedValueOnce('Failed to open path');
+    });
+
+    it('opens the parent folder when the file is missing but its folder exists', async () => {
+      const dir = abs('Users', 'rizz', 'proj');
+      fsEntries.set(dir, 'dir');
+      const input = `${dir}${isWin ? '\\' : '/'}notes.md:12:5)`;
+      const result = await getHandler(IPC.SHELL_OPEN_PATH)(fakeEvent, input);
+      expect(openPath.mock.calls).toEqual([[input], [dir]]);
+      expect(showItemInFolder).not.toHaveBeenCalled();
+      expect(result).toEqual({ ok: false, error: 'NOT_FOUND_OPENED_PARENT' });
+    });
+
+    it('opens the nearest existing ancestor of a deep missing path', async () => {
+      fsEntries.set(root, 'dir');
+      fsEntries.set(abs('Users'), 'dir');
+      fsEntries.set(abs('Users', 'rizz'), 'dir');
+      const input = abs('Users', 'rizz', 'a', 'b', 'c', 'd.txt');
+      const result = await getHandler(IPC.SHELL_OPEN_PATH)(fakeEvent, input);
+      expect(openPath.mock.calls).toEqual([[input], [abs('Users', 'rizz')]]);
+      expect(result).toEqual({ ok: false, error: 'NOT_FOUND_OPENED_PARENT' });
+    });
+
+    it('walks past an existing ancestor that is a file, not a folder', async () => {
+      fsEntries.set(abs('proj'), 'dir');
+      fsEntries.set(abs('proj', 'main.ts'), 'file');
+      const input = abs('proj', 'main.ts', 'glued');
+      const result = await getHandler(IPC.SHELL_OPEN_PATH)(fakeEvent, input);
+      expect(openPath.mock.calls).toEqual([[input], [abs('proj')]]);
+      expect(result).toEqual({ ok: false, error: 'NOT_FOUND_OPENED_PARENT' });
+    });
+
+    it('returns NOT_FOUND and opens nothing when no ancestor exists', async () => {
+      const input = abs('nowhere', 'file.txt');
+      const result = await getHandler(IPC.SHELL_OPEN_PATH)(fakeEvent, input);
+      expect(openPath).toHaveBeenCalledTimes(1);
+      expect(showItemInFolder).not.toHaveBeenCalled();
+      expect(result).toEqual({ ok: false, error: 'NOT_FOUND' });
+    });
+
+    it('stops at the UNC share root and never stats the bare server', async () => {
+      if (!isWin) return; // UNC syntax only parses with win32 path rules
+      const stat = vi.mocked((await import('fs/promises')).stat);
+      stat.mockClear();
+      const input = '\\\\srv\\share\\x\\y.txt';
+      const result = await getHandler(IPC.SHELL_OPEN_PATH)(fakeEvent, input);
+      expect(stat.mock.calls.map(c => c[0])).toEqual([
+        input, '\\\\srv\\share\\x', '\\\\srv\\share\\',
+      ]);
+      expect(result).toEqual({ ok: false, error: 'NOT_FOUND' });
+    });
+
+    it('gives up without opening anything when stat hangs', async () => {
+      vi.useFakeTimers();
+      try {
+        const input = isWin ? '\\\\deadhost\\share\\file.txt' : '/mnt/deadhost/file.txt';
+        fsEntries.set(input, 'hang');
+        let settled = false;
+        const pending = (getHandler(IPC.SHELL_OPEN_PATH)(fakeEvent, input) as Promise<unknown>)
+          .finally(() => { settled = true; });
+        await vi.advanceTimersByTimeAsync(2999);
+        expect(settled).toBe(false);
+        await vi.advanceTimersByTimeAsync(1);
+        await expect(pending).resolves.toEqual({ ok: false, error: 'LOOKUP_TIMEOUT' });
+        expect(openPath).toHaveBeenCalledTimes(1);
+        expect(showItemInFolder).not.toHaveBeenCalled();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('applies the same fallback to "Open with" File Explorer', async () => {
+      fsEntries.set(abs('repos'), 'dir');
+      const input = abs('repos', 'deleted-worktree');
+      const result = await getHandler(IPC.SHELL_OPEN_WITH)(fakeEvent, { appId: 'explorer', folderPath: input });
+      expect(openPath.mock.calls).toEqual([[input], [abs('repos')]]);
+      expect(result).toEqual({ ok: false, error: 'NOT_FOUND_OPENED_PARENT' });
+    });
   });
 
   describe('executable extension blocklist', () => {

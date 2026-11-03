@@ -110,6 +110,8 @@ export const ja = {
   'terminal.copyFailed': 'コピーに失敗しました — 選択を維持',
   'terminal.openPathBlocked': '実行ファイルをブロック — 親フォルダを開きました',
   'terminal.openPathFailed': '開けません — フォルダを表示',
+  'terminal.openPathMissingParent': 'パスが見つかりません — 最も近い親フォルダを開きました',
+  'terminal.openPathNotFound': 'パスが存在しないか、アクセスできません',
   'terminal.bookmarkAdded': 'ブックマークを追加',
 
   // Context menu

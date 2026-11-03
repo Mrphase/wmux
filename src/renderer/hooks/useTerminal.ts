@@ -35,6 +35,7 @@ import {
 } from '../terminal/replayMute';
 import { terminalFontFamilyCss } from '../utils/terminalFont';
 import { createPathLinkProvider } from '../terminal/pathLinkProvider';
+import { openPathToastKey, type OpenPathToastKey } from '../terminal/openPathToast';
 import { resolveNewlineKeyByte, wantsAltEnterNewline, foldAtPromptCarry, noteCodexEndedByPrompt } from '../terminal/newlineKeys';
 import { resolveMacLineDeleteByte } from '../terminal/macLineDeleteKey';
 import { isWslShell } from '../../shared/imagePaste';
@@ -613,7 +614,7 @@ export function showCopyToastText(text: string) {
 // associated app). Shares no DOM with the copy toasts so they can briefly
 // overlap if a user copies-then-clicks in quick succession.
 let openPathToastTimer: ReturnType<typeof setTimeout> | null = null;
-function showOpenPathToast(messageKey: 'terminal.openPathBlocked' | 'terminal.openPathFailed') {
+function showOpenPathToast(messageKey: OpenPathToastKey) {
   let el = document.getElementById('wmux-openpath-toast');
   if (!el) {
     el = document.createElement('div');
@@ -1311,16 +1312,16 @@ export function useTerminal(containerRef: React.RefObject<HTMLDivElement | null>
           // Main-side outcomes:
           //   • ok=true → opened cleanly, nothing to surface
           //   • error='BLOCKED_EXTENSION' → security gate refused (.exe etc.)
-          //   • error=<message> → openPath failed (file gone, no handler);
-          //     main already revealed the parent folder via showItemInFolder
+          //   • error='NOT_FOUND_OPENED_PARENT' → path missing; main opened
+          //     the nearest existing ancestor folder instead
+          //   • error='NOT_FOUND' | 'LOOKUP_TIMEOUT' → nothing reachable,
+          //     nothing opened
+          //   • error=<message> → openPath failed (no handler etc.); main
+          //     already revealed the file via showItemInFolder
           // The toast tells the user *why* their click landed on a folder
           // instead of opening the file — otherwise it reads as a no-op.
           if (!result || result.ok) return;
-          showOpenPathToast(
-            result.error === 'BLOCKED_EXTENSION'
-              ? 'terminal.openPathBlocked'
-              : 'terminal.openPathFailed',
-          );
+          showOpenPathToast(openPathToastKey(result.error));
         }).catch((err: unknown) => {
           // IPC-level rejection (validation throw: non-string, NUL byte,
           // not absolute, length cap). These are developer-visible bugs

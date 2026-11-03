@@ -351,6 +351,8 @@ export const zh = {
   'terminal.copyFailed': '复制失败 — 已保留选区',
   'terminal.openPathBlocked': '已阻止可执行文件 — 仅打开父文件夹',
   'terminal.openPathFailed': '无法打开 — 显示文件夹位置',
+  'terminal.openPathMissingParent': '路径不存在 — 已打开最近的上级文件夹',
+  'terminal.openPathNotFound': '路径不存在或无法访问',
   'terminal.bookmarkAdded': '已添加书签',
 
   // Context menu

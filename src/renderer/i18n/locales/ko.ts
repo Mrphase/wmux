@@ -662,6 +662,8 @@ export const ko = {
   'terminal.mouseOwnedSelectHintMac': '이 앱이 마우스를 사용 중 — Option을 누른 채 드래그하면 선택됩니다',
   'terminal.openPathBlocked': '실행 파일 차단됨 — 부모 폴더만 열림',
   'terminal.openPathFailed': '열 수 없음 — 폴더 위치 표시',
+  'terminal.openPathMissingParent': '경로 없음 — 가장 가까운 상위 폴더를 열었습니다',
+  'terminal.openPathNotFound': '경로가 없거나 접근할 수 없음',
   'terminal.bookmarkAdded': '북마크 추가됨',
   'terminal.imeInputRecovered': '한글 입력기에 키 입력이 갇혀 있어 자동으로 복구했습니다',
 

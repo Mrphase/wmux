@@ -933,6 +933,8 @@ export const pl = {
   'terminal.mouseOwnedSelectHintMac': 'Ta aplikacja używa myszy — przytrzymaj Option, aby zaznaczyć tekst',
   'terminal.openPathBlocked': 'Plik wykonywalny zablokowany — otwarto folder nadrzędny',
   'terminal.openPathFailed': 'Nie udało się otworzyć — pokazuję folder',
+  'terminal.openPathMissingParent': 'Nie znaleziono ścieżki — otwarto najbliższy istniejący folder',
+  'terminal.openPathNotFound': 'Ścieżka nie istnieje lub jest niedostępna',
   'terminal.bookmarkAdded': 'Dodano zakładkę',
   'terminal.scrollToBottom': 'Przewiń na dół',
   'terminal.imeInputRecovered': 'Wejście klawiatury utknęło w IME i zostało automatycznie odzyskane',

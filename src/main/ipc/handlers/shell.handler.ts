@@ -35,6 +35,83 @@ const BLOCKED_EXTENSIONS = new Set<string>([
   '.command', '.app', '.tool', '.terminal', '.workflow', '.sh',
 ]);
 
+// Budget for finding something to show after a failed open. fs.stat on a UNC
+// path whose server is unreachable blocks for the SMB timeout (20 s+); past
+// this the click gives up instead of opening a folder long after the fact.
+const LOOKUP_TIMEOUT_MS = 3000;
+
+type OpenResult = { ok: boolean; error?: string };
+
+type Located =
+  | { kind: 'self' }
+  | { kind: 'ancestor'; dir: string }
+  | { kind: 'none' }
+  | { kind: 'timeout' };
+
+/** 'dir' / 'other' when `p` exists, null when stat fails for any reason. */
+async function statKind(p: string): Promise<'dir' | 'other' | null> {
+  try {
+    return (await fs.stat(p)).isDirectory() ? 'dir' : 'other';
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * What to show for `target` once shell.openPath refused it: the target itself
+ * when it exists, else its nearest existing ancestor directory. The walk stops
+ * at the drive / UNC share root (where dirname is a fixed point), and the whole
+ * lookup is capped at LOOKUP_TIMEOUT_MS.
+ */
+async function locate(target: string, p: typeof path.win32): Promise<Located> {
+  let expired = false;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<Located>((resolve) => {
+    timer = setTimeout(() => {
+      expired = true;
+      resolve({ kind: 'timeout' });
+    }, LOOKUP_TIMEOUT_MS);
+  });
+  const walk = async (): Promise<Located> => {
+    if (await statKind(target)) return { kind: 'self' };
+    let cur = target;
+    // Stop issuing stats once the race is lost; a late result is discarded.
+    while (!expired) {
+      const parent = p.dirname(cur);
+      if (parent === cur) break;
+      if (await statKind(parent) === 'dir') return { kind: 'ancestor', dir: parent };
+      cur = parent;
+    }
+    return { kind: 'none' };
+  };
+  try {
+    return await Promise.race([walk(), timeout]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Fallback after shell.openPath(target) returned `err`. An existing target (no
+ * associated app, access refused) is selected in its folder. A missing one —
+ * typically a link whose detected text glued on extra characters — would make
+ * showItemInFolder a silent no-op on Windows, so the nearest existing ancestor
+ * folder is opened instead. That ancestor comes from dirname of an already
+ * normalized absolute path and is a directory, so the extension blocklist does
+ * not apply to it.
+ */
+async function revealFailedOpen(target: string, err: string, p: typeof path.win32): Promise<OpenResult> {
+  const found = await locate(target, p);
+  if (found.kind === 'self') {
+    shell.showItemInFolder(target);
+    return { ok: false, error: err };
+  }
+  if (found.kind === 'ancestor' && !(await shell.openPath(found.dir))) {
+    return { ok: false, error: 'NOT_FOUND_OPENED_PARENT' };
+  }
+  return { ok: false, error: found.kind === 'timeout' ? 'LOOKUP_TIMEOUT' : 'NOT_FOUND' };
+}
+
 export function registerShellHandlers(): () => void {
   const detector = new ShellDetector();
 
@@ -68,9 +145,9 @@ export function registerShellHandlers(): () => void {
   //   • must be an absolute path on the current OS (path.isAbsolute)
   //
   // Behaviour: shell.openPath opens folders in Explorer / Finder and files
-  // with the OS default app. When that fails (missing file, no associated
-  // app, permission denied) we fall back to showItemInFolder so the user
-  // can still locate the target.
+  // with the OS default app. When that fails, revealFailedOpen selects the
+  // target in its folder if it exists, or opens the nearest existing
+  // ancestor folder if it does not, so the click is never a silent no-op.
   ipcMain.removeHandler(IPC.SHELL_OPEN_PATH);
   ipcMain.handle(IPC.SHELL_OPEN_PATH, wrapHandler(IPC.SHELL_OPEN_PATH, async (_event: Electron.IpcMainInvokeEvent, rawPath: string) => {
     if (typeof rawPath !== 'string') {
@@ -99,14 +176,10 @@ export function registerShellHandlers(): () => void {
       return { ok: false, error: 'BLOCKED_EXTENSION' };
     }
     const err = await shell.openPath(normalized);
-    if (err) {
-      // openPath returns an error string when the file is missing, has no
-      // associated handler, or the OS refused the open. Reveal the parent
-      // folder so the user still gets useful feedback instead of a silent
-      // no-op.
-      shell.showItemInFolder(normalized);
-    }
-    return { ok: !err, error: err || undefined };
+    // openPath returns an error string when the file is missing, has no
+    // associated handler, or the OS refused the open.
+    if (err) return revealFailedOpen(normalized, err, path);
+    return { ok: true, error: undefined };
   }));
 
   // Total app memory across the whole Electron process tree. The StatusBar
@@ -182,8 +255,9 @@ export function registerShellHandlers(): () => void {
 
     if (appId === 'explorer') {
       const err = await shell.openPath(normalized);
-      if (err) shell.showItemInFolder(normalized);
-      return { ok: !err, error: err || undefined };
+      // A deleted workspace folder lands on its nearest surviving ancestor.
+      if (err) return revealFailedOpen(normalized, err, plat());
+      return { ok: true, error: undefined };
     }
 
     const appEntry = (await getAvailableFolderApps()).find(a => a.id === appId);
