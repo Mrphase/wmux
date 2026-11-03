@@ -2133,9 +2133,11 @@ export default function AppLayout() {
             the BOUNDARY is the absolutely-positioned thing: a crash costs the
             bar's own 40px strip, never the terminals' height. ToolbarHost's
             own `inset-0` fills this box, so the trigger band still measures to
-            the column's bottom edge. */}
+            the column's bottom edge. `pointer-events-none` like ToolbarHost:
+            otherwise this 40px band swallows every click on the bottom rows
+            of the panes, the scroll-to-bottom button included. */}
         <div
-          className="absolute inset-x-0 bottom-0"
+          className="absolute inset-x-0 bottom-0 pointer-events-none"
           style={{ height: AGENT_TOOLBAR_HEIGHT }}
           data-agent-toolbar-strip
         >
