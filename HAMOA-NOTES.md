@@ -31,6 +31,24 @@ Local fork of `openwong2kim/wmux`, rebased onto upstream `main`.
    subscriber ... after drain` in `~/.wmux/logs/daemon-*.log`.
    - Also run `wmux setup-hooks` so Claude hooks include `UserPromptSubmit`/`StopFailure`
      (the fleet "running" dot relies on them).
+4. `fix(layout)`: the 40px agent-toolbar hover strip is `pointer-events-none`; it used to eat
+   clicks on the panes' bottom rows (the terminal's scroll-to-bottom button stopped working).
+5. `feat(resume)`: the `↩ Resume Claude` chip stays visible while the agent runs (recover
+   button disabled + hint while busy) and gets a **Session** tab: agent, session id, bound
+   working dir (copyable), live cwd if different. `clearResumeHint` keeps the live binding,
+   otherwise every keystroke hid the chip until the next 15 s poll. `RemoteResumeChip` (SSH
+   panes) still hides while busy.
+6. `feat(shell)`: a Ctrl+clicked path that can't be opened falls back to its folder: existing
+   file → revealed in Explorer; missing → nearest existing ancestor (stops at drive / UNC share
+   root; 3 s probe cap). Toast says which happened (`NOT_FOUND_OPENED_PARENT`,
+   `NOT_FOUND`, `LOOKUP_TIMEOUT`).
+7. `fix(terminal)`: path links survive wrapping: soft wraps, Claude Code's hard-wrapped table
+   cells / prose, CJK wide-char columns, and full-width punctuation (`（`, `，`, …) ends a path.
+   Conservative (a miss beats a wrong join): the joined token must be longer than the
+   cell/row, every continuation must look like a path piece (`/`, `\` or `.ext`, no brackets,
+   not its own absolute path / finished filename), intermediate rows must be full, and shell
+   prompt rows never join. Known misses: a break right before `/`, an extension split across
+   rows (`foo.c` + `pp`).
 
 ## Dropped from 636f4dc (upstream fixed it)
 
@@ -56,7 +74,8 @@ npm run package     # -> out\wmux-win32-arm64
 
 ## Deploy (side-by-side)
 
-- Installed to `%LOCALAPPDATA%\wmux\app-4.1.0-hamoa`; `~\.local\bin\wmux-latest.cmd` points there.
+- Installed to `%LOCALAPPDATA%\wmux\app-4.1.0-hamoa-N` (latest: `-3`, tag `hamoa-v4.1.0-3`);
+  `~\.local\bin\wmux-latest.cmd` points there. Older `-N` dirs are kept for rollback.
 - `app-3.40.2-main` is untouched. Backups of `session.json`, `~\.wmux\sessions.json` and the old
   launcher: `~\.codex\backups\wmux-v4-upgrade-<timestamp>`.
 - Rollback: quit wmux, restore the `.cmd` and the two JSON files from the backup, relaunch.
