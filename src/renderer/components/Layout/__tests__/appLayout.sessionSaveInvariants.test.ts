@@ -97,6 +97,7 @@ describe('AppLayout — axis A session-save invariants', () => {
       workspaces: [],
       archivedWorkspaces: [],
       orchestratorRoleBindings: {},
+      trustedCwdRoots: [],
       layoutTemplates: [],
       recentCommands: [],
       toolbarSnippets: [],
